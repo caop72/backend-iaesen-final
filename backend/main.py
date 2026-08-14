@@ -21,7 +21,8 @@ app.add_middleware(
 
 # Configuración
 DB_PATH = "entrevistas.db"
-AUDIO_BASE = "/data/audios"  # Cambiar según entorno
+# AUDIO_BASE = "/data/audios"  <-- ELIMINAR ESTA LÍNEA
+AUDIO_BASE = os.path.join(os.path.dirname(__file__), "audios")  # <-- CAMBIAR A ESTO
 
 # ------------------------------------------------------------------
 # BASE DE DATOS (SQLite)
