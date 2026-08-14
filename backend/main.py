@@ -121,7 +121,16 @@ async def listar_perfiles():
 
 @app.get("/api/audio/{tipo}/{numero}")
 async def get_audio(tipo: str, numero: int):
-    archivo = f"{AUDIO_BASE}/{tipo}{numero:02d}.mp3"
+    # Si tipo es 'pregunta', el archivo se llama p#.mp3
+    # Si tipo es 'item', el archivo se llama i#.mp3
+    if tipo == "pregunta":
+        nombre_archivo = f"p{numero}.mp3"
+    elif tipo == "item":
+        nombre_archivo = f"i{numero}.mp3"
+    else:
+        raise HTTPException(400, "Tipo de audio no válido")
+    
+    archivo = os.path.join(AUDIO_BASE, nombre_archivo)
     if not os.path.exists(archivo):
         raise HTTPException(404, "Audio no encontrado")
     return FileResponse(archivo, media_type="audio/mpeg")
