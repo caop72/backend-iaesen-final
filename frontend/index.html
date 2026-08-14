@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es-VE">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema de Entrevistas - IAESEN</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b132b">
+    <style>
+        :root {
+            --bg-primary: #0b132b;
+            --bg-card: #1c2541;
+            --text-primary: #e0f7fa;
+            --text-secondary: #90e0ef;
+            --accent-blue: #00b4d8;
+            --accent-green: #2a9d8f;
+            --accent-red: #e63946;
+            --border-color: #3a506b;
+            --shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-primary); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
+        .app-container { width: 100%; max-width: 800px; margin: 0 auto; }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-4px); border-color: var(--accent-blue); }
+        .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .card-header h2 { font-size: 1.4rem; margin: 0; color: var(--text-primary); }
+        .card-header .icon { font-size: 2rem; }
+        .card p { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 16px; }
+        .btn { display: inline-block; width: 100%; padding: 14px 0; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: all 0.3s; text-align: center; color: #fff; }
+        .btn-primary { background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%); }
+        .btn-primary:hover { opacity: 0.9; transform: scale(1.01); }
+        .btn-green { background: linear-gradient(135deg, #2a9d8f 0%, #264653 100%); }
+        .btn-red { background: linear-gradient(135deg, #e63946 0%, #a4161a 100%); }
+        .btn-secondary { background: #3a506b; }
+        .btn-secondary:hover { background: #4a607b; }
+        .hidden { display: none !important; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background-color: #0b132b; color: var(--text-primary); font-size: 1rem; }
+        .form-group select option { background-color: #1c2541; }
+        .language-selector { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+        .language-selector select { width: auto; padding: 8px 12px; border-radius: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .progress-steps { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .step { background: var(--border-color); padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; }
+        .step.active { background: var(--accent-blue); color: #fff; }
+        .step.done { background: var(--accent-green); color: #fff; }
+        .audio-player { width: 100%; margin: 12px 0; }
+        .recorder-controls { display: flex; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+        .recorder-controls .btn { width: auto; padding: 10px 24px; flex: 1; }
+        #transcription-box { width: 100%; min-height: 120px; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: #0b132b; color: var(--text-primary); font-size: 1rem; resize: vertical; }
+        .video-preview { width: 100%; max-width: 320px; border-radius: 8px; margin: 12px auto; display: block; background: #000; }
+        .status-msg { padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.9rem; }
+        .status-msg.success { background: rgba(42, 157, 143, 0.2); border: 1px solid var(--accent-green); }
+        .status-msg.error { background: rgba(230, 57, 70, 0.2); border: 1px solid var(--accent-red); }
+        @media (max-width: 480px) { .card { padding: 16px; } .card-header h2 { font-size: 1.1rem; } }
+    </style>
+</head>
+<body>
+    <div class="app-container" id="app">
+        <div class="language-selector">
+            <select id="lang-selector">
+                <option value="es-VE">Español (Venezuela)</option>
+                <option value="es-ES">Español (España)</option>
+                <option value="en-US">English</option>
+                <option value="pt-BR">Português</option>
+            </select>
+        </div>
+
+        <!-- PANTALLA DE INICIO (TARJETAS) -->
+        <div id="view-home">
+            <div class="card" onclick="selectRole('no_experto')">
+                <div class="card-header"><span class="icon">🔵</span><h2>No experto</h2></div>
+                <p>Participación anónima. No se guardan datos personales.</p>
+                <button class="btn btn-primary">Entrar</button>
+            </div>
+            <div class="card" onclick="selectRole('experto')">
+                <div class="card-header"><span class="icon">🔴</span><h2>Experto</h2></div>
+                <p>Acceso a la entrevista formal con selección de perfil.</p>
+                <button class="btn btn-primary">Acceder</button>
+            </div>
+            <div class="card" onclick="selectRole('investigador')">
+                <div class="card-header"><span class="icon">🟢</span><h2>Investigador</h2></div>
+                <p>Dashboard de avances y sincronización de videos.</p>
+                <button class="btn btn-primary">Panel</button>
+            </div>
+        </div>
+
+        <!-- PANTALLA: REGISTRO EXPERTO -->
+        <div id="view-experto" class="hidden">
+            <div class="card">
+                <h2 style="color: var(--accent-blue); margin-bottom: 16px;">🔴 Registro de Experto</h2>
+                <div class="form-group">
+                    <label>Seleccione su perfil</label>
+                    <select id="perfil-experto">
+                        <option value="">-- Seleccione --</option>
+                    </select>
+                </div>
+                <div id="experto-datos" class="hidden">
+                    <div class="form-group"><label>Grado / Título</label><select id="grado"><option>Teniente</option><option>Coronel</option><option>Ciudadano</option></select></div>
+                    <div class="form-group"><label>Nombre y Apellidos</label><input type="text" id="nombre" placeholder="Ej: Juan Pérez"></div>
+                    <div class="form-group"><label>Correo Electrónico</label><input type="email" id="email" placeholder="ejemplo@correo.com"></div>
+                    <div class="form-group"><label>Cargo u Oficio</label><input type="text" id="cargo" placeholder="Ej: Director"></div>
+                    <div class="form-group"><label>Institución</label><input type="text" id="institucion" value="FANB"></div>
+                    <div class="form-group"><label>¿Desea grabar video?</label>
+                        <select id="opcion-video"><option value="no">No, solo audio</option><option value="si">Sí, audio + video</option></select>
+                    </div>
+                    <button class="btn btn-green" onclick="iniciarEntrevistaExperto()">🚀 Iniciar Entrevista</button>
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="goHome()">⬅ Volver al inicio</button>
+        </div>
+
+        <!-- PANTALLA: NO EXPERTO -->
+        <div id="view-no-experto" class="hidden">
+            <div class="card">
+                <h2 style="color: var(--accent-blue);">🔵 No experto</h2>
+                <p style="color: var(--text-secondary);">Su participación es completamente anónima. No se solicitarán datos personales.</p>
+                <button class="btn btn-green" onclick="iniciarEntrevistaNoExperto()">🚀 Iniciar Entrevista</button>
+            </div>
+            <button class="btn btn-secondary" onclick="goHome()">⬅ Volver al inicio</button>
+        </div>
+
+        <!-- PANTALLA: ENTREVISTA -->
+        <div id="view-entrevista" class="hidden">
+            <div class="card">
+                <div class="progress-steps" id="progress-steps"></div>
+                <div id="audio-section">
+                    <audio id="audio-player" class="audio-player" controls></audio>
+                </div>
+                <div id="video-section" class="hidden">
+                    <video id="video-preview" class="video-preview" muted></video>
+                </div>
+                <h3 id="pregunta-texto" style="color: var(--text-secondary); margin: 16px 0;">Cargando pregunta...</h3>
+                <div class="recorder-controls">
+                    <button class="btn btn-primary" id="btn-grabar" onclick="toggleRecording()">🎙️ Grabar respuesta</button>
+                    <button class="btn btn-secondary" id="btn-detener" onclick="stopRecording()" disabled>⏹ Detener</button>
+                </div>
+                <div class="form-group">
+                    <label>Transcripción / Respuesta escrita</label>
+                    <textarea id="transcription-box" placeholder="Hable para ver la transcripción en tiempo real..."></textarea>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 12px;">
+                    <button class="btn btn-secondary" id="btn-anterior" onclick="navegar(-1)" disabled>⬅ Anterior</button>
+                    <button class="btn btn-green" id="btn-siguiente" onclick="navegar(1)">Siguiente ➡</button>
+                </div>
+                <div id="status-msg" class="status-msg hidden"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="goHome()">⬅ Salir de la entrevista</button>
+        </div>
+
+        <!-- PANTALLA: INVESTIGADOR -->
+        <div id="view-investigador" class="hidden">
+            <div class="card">
+                <h2 style="color: var(--accent-blue);">🟢 Panel del Investigador</h2>
+                <div class="form-group"><label>Clave de acceso</label><input type="password" id="clave-investigador" placeholder="••••"></div>
+                <button class="btn btn-primary" onclick="accederDashboard()">🔓 Acceder al Dashboard</button>
+                <div id="dashboard-content" class="hidden">
+                    <h3 style="color: var(--text-secondary); margin-top: 16px;">📊 Dashboard de Avances</h3>
+                    <div id="dashboard-stats">Cargando datos...</div>
+                    <button class="btn btn-green" style="margin-top: 12px;" onclick="sincronizarVideos()">🔁 Sincronizar videos pendientes</button>
+                    <div id="sync-status" class="status-msg hidden"></div>
+                </div>
+            </div>
+            <button class="btn btn-secondary" onclick="goHome()">⬅ Volver al inicio</button>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
