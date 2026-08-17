@@ -99,6 +99,9 @@ def sincronizar_respuesta(respuesta_id: int):
     try:
         service = obtener_servicio_sheets()
         sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
+        # Obtener el nombre de la primera pestaña automáticamente
+        sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        sheet_name = sheet_metadata['sheets'][0]['properties']['title']
         valores = [[
             sesion_id, item_idx + 1, sub_idx + 1, transcripcion,
             audio_path or "", video_path or "",
@@ -106,7 +109,7 @@ def sincronizar_respuesta(respuesta_id: int):
         ]]
         service.spreadsheets().values().append(
             spreadsheetId=sheet_id,
-            range="Respuestas!A:G",
+            range=f"{sheet_name}!A:G",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": valores}
@@ -219,27 +222,21 @@ async def guardar_respuesta(
     transcripcion: str = Form(...),
     perfil: str = Form(...),
     lang: str = Form("es-VE"),
-    audio: Optional[UploadFile] = File(None),
-    video: Optional[UploadFile] = File(None)
+    audio: Optional[UploadFile] = File(None)
 ):
-    if not transcripcion.strip() and audio is None and video is None:
+    if not transcripcion.strip() and audio is None:
         raise HTTPException(422, "Respuesta vacía")
     audio_path = None
-    video_path = None
     if audio:
         audio_path = f"/data/audios_respuestas/{sessionId}_{itemIdx}_{subIdx}_audio.webm"
         async with aiofiles.open(audio_path, 'wb') as f:
             await f.write(await audio.read())
-    if video:
-        video_path = f"/data/videos_respuestas/{sessionId}_{itemIdx}_{subIdx}_video.webm"
-        async with aiofiles.open(video_path, 'wb') as f:
-            await f.write(await video.read())
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO respuestas 
-                 (sesion_id, item_idx, sub_idx, audio_path, video_path, transcripcion, lang, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-              (sessionId, itemIdx, subIdx, audio_path, video_path, transcripcion, lang, datetime.datetime.now()))
+                 (sesion_id, item_idx, sub_idx, audio_path, transcripcion, lang, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)''',
+              (sessionId, itemIdx, subIdx, audio_path, transcripcion, lang, datetime.datetime.now()))
     respuesta_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -296,15 +293,20 @@ async def test_sheets():
     try:
         service = obtener_servicio_sheets()
         sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
+        
+        # Obtener el nombre de la primera pestaña automáticamente
+        sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
+        sheet_name = sheet_metadata['sheets'][0]['properties']['title']
+        
         body = {"values": [["PRUEBA", "Sincronización manual", datetime.datetime.now().isoformat()]]}
         service.spreadsheets().values().append(
             spreadsheetId=sheet_id,
-            range="Respuestas!A:C",
+            range=f"{sheet_name}!A:C",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body=body
         ).execute()
-        return JSONResponse({"status": "ok", "mensaje": "Conexión exitosa. Fila agregada."})
+        return JSONResponse({"status": "ok", "mensaje": f"Conexión exitosa. Fila agregada en pestaña '{sheet_name}'."})
     except Exception as e:
         return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
 
