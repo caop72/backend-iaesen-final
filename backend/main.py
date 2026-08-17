@@ -1,14 +1,16 @@
-# main.py - Backend completo para la entrevista
+# main.py - Versión definitiva con sincronización real a Google Sheets
 import os
 import sqlite3
 import uuid
 import json
 import datetime
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import aiofiles
 from typing import Optional
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 app = FastAPI()
 
@@ -21,8 +23,7 @@ app.add_middleware(
 
 # Configuración
 DB_PATH = "entrevistas.db"
-# AUDIO_BASE = "/data/audios"  <-- ELIMINAR ESTA LÍNEA
-AUDIO_BASE = os.path.join(os.path.dirname(__file__), "audios")  # <-- CAMBIAR A ESTO
+AUDIO_BASE = os.path.join(os.path.dirname(__file__), "audios")
 
 # ------------------------------------------------------------------
 # BASE DE DATOS (SQLite)
@@ -51,7 +52,9 @@ def init_db():
         video_path TEXT,
         transcripcion TEXT,
         lang TEXT,
-        synced BOOLEAN DEFAULT 0,
+        sync_status TEXT DEFAULT 'pending',
+        sync_error TEXT,
+        synced_at TIMESTAMP,
         created_at TIMESTAMP
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS perfiles (
@@ -62,13 +65,66 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Cargar matriz de expertos
 def cargar_matriz():
     with open("matriz.json", "r") as f:
         return json.load(f)
 
 init_db()
 matriz = cargar_matriz()
+
+# ------------------------------------------------------------------
+# CONEXIÓN A GOOGLE SHEETS
+# ------------------------------------------------------------------
+def obtener_servicio_sheets():
+    raw = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    if not raw:
+        raise ValueError("GOOGLE_CREDENTIALS_JSON no configurada")
+    creds_dict = json.loads(raw)
+    credentials = service_account.Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    return build("sheets", "v4", credentials=credentials, cache_discovery=False)
+
+def sincronizar_respuesta(respuesta_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT sesion_id, item_idx, sub_idx, transcripcion, audio_path, video_path 
+                 FROM respuestas WHERE id = ?''', (respuesta_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return
+    sesion_id, item_idx, sub_idx, transcripcion, audio_path, video_path = row
+    try:
+        service = obtener_servicio_sheets()
+        sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
+        valores = [[
+            sesion_id, item_idx + 1, sub_idx + 1, transcripcion,
+            audio_path or "", video_path or "",
+            datetime.datetime.now().isoformat()
+        ]]
+        service.spreadsheets().values().append(
+            spreadsheetId=sheet_id,
+            range="Respuestas!A:G",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": valores}
+        ).execute()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''UPDATE respuestas SET sync_status = 'synced', synced_at = ? WHERE id = ?''',
+                  (datetime.datetime.now().isoformat(), respuesta_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''UPDATE respuestas SET sync_status = 'failed', sync_error = ? WHERE id = ?''',
+                  (str(e), respuesta_id))
+        conn.commit()
+        conn.close()
+        raise e
 
 # ------------------------------------------------------------------
 # ENDPOINTS DE LA API
@@ -80,15 +136,12 @@ async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None)
                        grado: Optional[str] = Form(None), lang: str = Form("es-VE")):
     session_id = str(uuid.uuid4())
     items = []
-    
     if role == "experto" and perfil:
-        # Buscar perfil en la matriz
         for key, val in matriz.items():
             if val["id"] == perfil:
                 items = val["items"]
                 break
     elif role == "no_experto":
-        # No experto: selección aleatoria de 3 ítems del pool
         import random
         pool = [1,2,3,4,6,12]
         items = random.sample(pool, 3)
@@ -97,8 +150,6 @@ async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None)
         cargo = "Particular"
         institucion = "Ciudadano"
         grado = "Ciudadano"
-
-    # Guardar sesión en BD
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO sesiones (id, role, perfil, nombre, email, institucion, grado, cargo, lang, created_at)
@@ -106,7 +157,6 @@ async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None)
               (session_id, role, perfil, nombre, email, institucion, grado, cargo, lang, datetime.datetime.now()))
     conn.commit()
     conn.close()
-
     return JSONResponse({
         "sessionId": session_id,
         "items": items,
@@ -115,22 +165,36 @@ async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None)
 
 @app.get("/api/perfiles")
 async def listar_perfiles():
-    perfiles = []
-    for key, val in matriz.items():
-        perfiles.append({"id": key, "nombre": val["nombre"]})
-    return JSONResponse(perfiles)
+    return JSONResponse([{"id": key, "nombre": val["nombre"]} for key, val in matriz.items()])
+
+@app.get("/api/item/{numero}")
+async def get_item(numero: int, lang: str = "es-VE"):
+    titulos = {
+        "es-VE": {
+            1: "Marco Normativo y Barreras Físico-Estructurales",
+            2: "Percepción de Amenazas y Paradoja de la Inacción",
+            3: "Resistencia, Saberes Comunitarios y Corresponsabilidad",
+            4: "Alianzas Público-Privadas y Viabilidad Económica",
+            5: "Cibernética, Homeostasis e Integración OT/IT",
+            6: "Subsuelo Productivo y Soberanía Alimentaria",
+            7: "Epistemología y Producción de Conocimiento en Defensa",
+            8: "Filtros de Información y Narrativas Estratégicas",
+            9: "Cultura Organizacional y Resistencia al Cambio",
+            10: "Articulación Interinstitucional y Coordinación",
+            11: "El Rol Estratégico de la FANB en la Praxis Soterrada",
+            12: "Prospectiva, Escenarios y Recomendaciones de Futuro"
+        }
+    }
+    return JSONResponse({"titulo": titulos.get(lang, titulos["es-VE"]).get(numero, f"Ítem {numero}")})
 
 @app.get("/api/audio/{tipo}/{numero}")
 async def get_audio(tipo: str, numero: int):
-    # Si tipo es 'pregunta', el archivo se llama p#.mp3
-    # Si tipo es 'item', el archivo se llama i#.mp3
     if tipo == "pregunta":
         nombre_archivo = f"p{numero}.mp3"
     elif tipo == "item":
         nombre_archivo = f"i{numero}.mp3"
     else:
         raise HTTPException(400, "Tipo de audio no válido")
-    
     archivo = os.path.join(AUDIO_BASE, nombre_archivo)
     if not os.path.exists(archivo):
         raise HTTPException(404, "Audio no encontrado")
@@ -138,8 +202,6 @@ async def get_audio(tipo: str, numero: int):
 
 @app.get("/api/pregunta/{numero}")
 async def get_pregunta(numero: int, lang: str = "es-VE"):
-    # Aquí se cargarían las preguntas traducidas desde un JSON
-    # Por ahora, retornamos un texto dummy
     textos = {
         "es-VE": f"Pregunta número {numero} en español de Venezuela.",
         "es-ES": f"Pregunta número {numero} en español de España.",
@@ -150,6 +212,7 @@ async def get_pregunta(numero: int, lang: str = "es-VE"):
 
 @app.post("/api/respuesta")
 async def guardar_respuesta(
+    background_tasks: BackgroundTasks,
     sessionId: str = Form(...),
     itemIdx: int = Form(...),
     subIdx: int = Form(...),
@@ -159,28 +222,33 @@ async def guardar_respuesta(
     audio: Optional[UploadFile] = File(None),
     video: Optional[UploadFile] = File(None)
 ):
+    if not transcripcion.strip() and audio is None and video is None:
+        raise HTTPException(422, "Respuesta vacía")
     audio_path = None
     video_path = None
-    
     if audio:
         audio_path = f"/data/audios_respuestas/{sessionId}_{itemIdx}_{subIdx}_audio.webm"
         async with aiofiles.open(audio_path, 'wb') as f:
             await f.write(await audio.read())
-    
     if video:
         video_path = f"/data/videos_respuestas/{sessionId}_{itemIdx}_{subIdx}_video.webm"
         async with aiofiles.open(video_path, 'wb') as f:
             await f.write(await video.read())
-
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''INSERT INTO respuestas (sesion_id, item_idx, sub_idx, audio_path, video_path, transcripcion, lang, created_at)
+    c.execute('''INSERT INTO respuestas 
+                 (sesion_id, item_idx, sub_idx, audio_path, video_path, transcripcion, lang, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
               (sessionId, itemIdx, subIdx, audio_path, video_path, transcripcion, lang, datetime.datetime.now()))
+    respuesta_id = c.lastrowid
     conn.commit()
     conn.close()
-    
-    return JSONResponse({"status": "ok"})
+    background_tasks.add_task(sincronizar_respuesta, respuesta_id)
+    return JSONResponse({
+        "status": "saved",
+        "respuesta_id": respuesta_id,
+        "sync_status": "queued"
+    })
 
 @app.get("/api/admin/dashboard")
 async def dashboard():
@@ -190,7 +258,7 @@ async def dashboard():
     total_respuestas = c.fetchone()[0]
     c.execute("SELECT COUNT(DISTINCT sesion_id) FROM respuestas")
     total_sesiones = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM respuestas WHERE video_path IS NOT NULL AND transcripcion IS NULL")
+    c.execute("SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed'")
     videos_pendientes = c.fetchone()[0]
     conn.close()
     return JSONResponse({
@@ -201,9 +269,44 @@ async def dashboard():
 
 @app.post("/api/admin/sincronizar_videos")
 async def sincronizar_videos():
-    # Simulación de sincronización
-    # En producción, esto extraería el audio del video y lo transcribiría
-    return JSONResponse({"mensaje": "Sincronización completada. 5 videos transcritos."})
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT id FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' LIMIT 100''')
+    pendientes = [row[0] for row in c.fetchall()]
+    conn.close()
+    for pid in pendientes:
+        try:
+            sincronizar_respuesta(pid)
+        except:
+            pass
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' ''')
+    restantes = c.fetchone()[0]
+    conn.close()
+    return JSONResponse({
+        "mensaje": f"Procesados {len(pendientes)} registros. Pendientes: {restantes}."
+    })
+
+# ==========================================
+# ENDPOINT DE PRUEBA PARA GOOGLE SHEETS
+# ==========================================
+@app.get("/api/admin/test-sheets")
+async def test_sheets():
+    try:
+        service = obtener_servicio_sheets()
+        sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
+        body = {"values": [["PRUEBA", "Sincronización manual", datetime.datetime.now().isoformat()]]}
+        service.spreadsheets().values().append(
+            spreadsheetId=sheet_id,
+            range="Respuestas!A:C",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body=body
+        ).execute()
+        return JSONResponse({"status": "ok", "mensaje": "Conexión exitosa. Fila agregada."})
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
 
 if __name__ == "__main__":
     import uvicorn
