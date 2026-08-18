@@ -1,4 +1,4 @@
-// app.js - Versión con correcciones para móviles (botón mantener presionado, transcripción reforzada, Sheets directo)
+// app.js - Versión estable (botón de un solo toque, sin mantener presionado)
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -245,83 +245,12 @@ function actualizarHexagono() {
     }
 }
 
-// Botón de grabar estilo "mantener presionado" (como Telegram/WhatsApp)
-let holdTimer = null;
-let isHolding = false;
-
-function setupRecordButton() {
-    const btn = document.getElementById('btn-record');
-    
-    btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (btn.disabled) return;
-        isHolding = true;
-        holdTimer = setTimeout(() => {
-            if (isHolding) {
-                startRecording();
-                btn.classList.add('recording');
-                document.getElementById('record-text').innerText = "grabando...";
-                document.getElementById('vu-meter').classList.add('active');
-            }
-        }, 300); // 300ms de espera para evitar activaciones accidentales
-    });
-
-    btn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        isHolding = false;
-        if (holdTimer) {
-            clearTimeout(holdTimer);
-            holdTimer = null;
-        }
-        if (state.isRecording) {
-            stopRecording();
-            btn.classList.remove('recording');
-            document.getElementById('record-text').innerText = "grabar su opinión";
-            document.getElementById('vu-meter').classList.remove('active');
-        }
-    });
-
-    // Soporte para mouse (escritorio)
-    btn.addEventListener('mousedown', (e) => {
-        if (btn.disabled) return;
-        isHolding = true;
-        holdTimer = setTimeout(() => {
-            if (isHolding) {
-                startRecording();
-                btn.classList.add('recording');
-                document.getElementById('record-text').innerText = "grabando...";
-                document.getElementById('vu-meter').classList.add('active');
-            }
-        }, 300);
-    });
-
-    btn.addEventListener('mouseup', (e) => {
-        isHolding = false;
-        if (holdTimer) {
-            clearTimeout(holdTimer);
-            holdTimer = null;
-        }
-        if (state.isRecording) {
-            stopRecording();
-            btn.classList.remove('recording');
-            document.getElementById('record-text').innerText = "grabar su opinión";
-            document.getElementById('vu-meter').classList.remove('active');
-        }
-    });
-
-    btn.addEventListener('mouseleave', (e) => {
-        isHolding = false;
-        if (holdTimer) {
-            clearTimeout(holdTimer);
-            holdTimer = null;
-        }
-        if (state.isRecording) {
-            stopRecording();
-            btn.classList.remove('recording');
-            document.getElementById('record-text').innerText = "grabar su opinión";
-            document.getElementById('vu-meter').classList.remove('active');
-        }
-    });
+async function toggleRecording() {
+    if (state.isRecording) {
+        stopRecording();
+        return;
+    }
+    await startRecording();
 }
 
 async function startRecording() {
@@ -339,13 +268,14 @@ async function startRecording() {
             const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
             state.tieneAudio = true;
             document.getElementById('btn-play-response').disabled = false;
-            mostrarStatus('Grabación finalizada.', 'success');
         };
 
         state.mediaRecorder.start();
         state.isRecording = true;
-
+        document.getElementById('btn-record').classList.add('recording');
+        document.getElementById('record-text').innerText = "grabando...";
         iniciarReconocimiento();
+        mostrarStatus('Grabando...', 'success');
     } catch (e) {
         if (e.name === 'NotAllowedError') {
             mostrarStatus('Permiso de micrófono denegado.', 'error');
@@ -364,6 +294,13 @@ function stopRecording() {
         state.isRecognizing = false;
     }
     state.isRecording = false;
+    document.getElementById('btn-record').classList.remove('recording');
+    document.getElementById('record-text').innerText = "grabar su opinión";
+    mostrarStatus('Grabación finalizada.', 'success');
+    if (state.stream) {
+        state.stream.getTracks().forEach(track => track.stop());
+        state.stream = null;
+    }
 }
 
 function iniciarReconocimiento() {
@@ -456,7 +393,6 @@ function playResponse() {
     const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    
     state.isPlayingResponse = true;
     audio.onended = () => {
         state.isPlayingResponse = false;
@@ -477,7 +413,7 @@ async function confirmarEnvio() {
     }
     const guardado = await guardarRespuesta(respuesta);
     if (!guardado) {
-        mostrarStatus('Error al guardar la respuesta. Intente nuevamente.', 'error');
+        mostrarStatus('No se pudo guardar la respuesta.', 'error');
         return;
     }
     const itemIdx = state.currentItemIdx;
@@ -545,11 +481,6 @@ async function guardarRespuesta(respuesta) {
     try {
         const res = await fetch(`${API_BASE}/respuesta`, { method: 'POST', body: formData });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data.status === 'saved_with_warning') {
-            mostrarStatus('Respuesta guardada, pero hubo un problema con Sheets.', 'error');
-            return false;
-        }
         state.audioChunks = [];
         return true;
     } catch (e) {
@@ -623,5 +554,4 @@ async function sincronizarVideos() {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('view-portada').classList.remove('hidden');
-    setupRecordButton();
 });
