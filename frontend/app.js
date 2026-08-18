@@ -1,5 +1,5 @@
-// app.js - Motor de la PWA (Vanilla JS + FSM)
-const API_BASE = 'https://tu-backend.onrender.com/api'; // CAMBIAR POR URL REAL DEL BACKEND
+// app.js - Versión final con transcripción corregida y todas las mejoras de UX
+const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
     role: null,
@@ -10,38 +10,36 @@ let state = {
     currentItemIdx: 0,
     currentSubIdx: 0,
     answers: {},
+    textoManual: '',
+    transcripcion: '',
+    tieneAudio: false,
     mediaRecorder: null,
     audioChunks: [],
-    videoChunks: [],
     isRecording: false,
-    transcription: '',
-    useVideo: false,
+    isPlaying: false,
+    recognition: null,
+    isRecognizing: false,
     stream: null
 };
 
-// ------------------------------------------------------------------
-// SELECTOR DE IDIOMA
-// ------------------------------------------------------------------
 document.getElementById('lang-selector').addEventListener('change', (e) => {
     state.lang = e.target.value;
-    console.log('Idioma seleccionado:', state.lang);
 });
 
-// ------------------------------------------------------------------
-// NAVEGACIÓN ENTRE VISTAS
-// ------------------------------------------------------------------
+function mostrarMenu() {
+    document.getElementById('view-portada').classList.add('hidden');
+    document.getElementById('view-home').classList.remove('hidden');
+}
+
 function showView(viewId) {
     document.querySelectorAll('.app-container > div[id^="view-"]').forEach(el => el.classList.add('hidden'));
     document.getElementById(viewId).classList.remove('hidden');
 }
 
 function goHome() {
-    showView('view-home');
+    mostrarMenu();
 }
 
-// ------------------------------------------------------------------
-// SELECCIÓN DE ROL (TARJETAS)
-// ------------------------------------------------------------------
 function selectRole(role) {
     state.role = role;
     if (role === 'no_experto') {
@@ -54,9 +52,6 @@ function selectRole(role) {
     }
 }
 
-// ------------------------------------------------------------------
-// CARGA DE PERFILES DE EXPERTOS (DESDE LA API)
-// ------------------------------------------------------------------
 async function cargarPerfiles() {
     try {
         const res = await fetch(`${API_BASE}/perfiles`);
@@ -81,9 +76,6 @@ document.getElementById('perfil-experto').addEventListener('change', (e) => {
     }
 });
 
-// ------------------------------------------------------------------
-// INICIO DE ENTREVISTA (EXPERTO)
-// ------------------------------------------------------------------
 async function iniciarEntrevistaExperto() {
     const perfil = document.getElementById('perfil-experto').value;
     const nombre = document.getElementById('nombre').value;
@@ -91,23 +83,32 @@ async function iniciarEntrevistaExperto() {
     const cargo = document.getElementById('cargo').value;
     const institucion = document.getElementById('institucion').value;
     const grado = document.getElementById('grado').value;
-    const useVideo = document.getElementById('opcion-video').value === 'si';
 
     if (!perfil || !nombre || !email || !cargo) {
         mostrarStatus('Por favor complete todos los campos requeridos.', 'error');
         return;
     }
 
-    state.useVideo = useVideo;
     state.perfil = perfil;
     state.lang = document.getElementById('lang-selector').value;
 
     try {
+        const formData = new FormData();
+        formData.append('role', 'experto');
+        formData.append('perfil', perfil);
+        formData.append('nombre', nombre);
+        formData.append('email', email);
+        formData.append('cargo', cargo);
+        formData.append('institucion', institucion);
+        formData.append('grado', grado);
+        formData.append('lang', state.lang);
+
         const res = await fetch(`${API_BASE}/sesion`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'experto', perfil, nombre, email, cargo, institucion, grado, lang: state.lang })
+            body: formData
         });
+
+        if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
         state.sessionId = data.sessionId;
         state.items = data.items;
@@ -120,18 +121,19 @@ async function iniciarEntrevistaExperto() {
     }
 }
 
-// ------------------------------------------------------------------
-// INICIO DE ENTREVISTA (NO EXPERTO)
-// ------------------------------------------------------------------
 async function iniciarEntrevistaNoExperto() {
-    state.useVideo = false;
     state.lang = document.getElementById('lang-selector').value;
     try {
+        const formData = new FormData();
+        formData.append('role', 'no_experto');
+        formData.append('lang', state.lang);
+
         const res = await fetch(`${API_BASE}/sesion`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'no_experto', lang: state.lang })
+            body: formData
         });
+
+        if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
         state.sessionId = data.sessionId;
         state.items = data.items;
@@ -144,64 +146,109 @@ async function iniciarEntrevistaNoExperto() {
     }
 }
 
-// ------------------------------------------------------------------
-// CARGA DE PREGUNTA Y AUDIOS
-// ------------------------------------------------------------------
 async function cargarPregunta() {
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
     const itemNum = state.items[itemIdx];
     const globalIdx = (itemIdx * 3) + subIdx + 1;
 
-    document.getElementById('audio-player').src = '';
-    document.getElementById('audio-section').classList.remove('hidden');
-    document.getElementById('video-section').classList.add('hidden');
+    state.textoManual = '';
+    state.transcripcion = '';
+    state.tieneAudio = false;
+    state.isRecognizing = false;
+    state.isRecording = false;
 
-    // Cargar audio de la pregunta
-    const audioUrl = `${API_BASE}/audio/pregunta/${globalIdx}`;
-    document.getElementById('audio-player').src = audioUrl;
-    document.getElementById('audio-player').load();
+    document.getElementById('btn-record').disabled = true;
+    document.getElementById('btn-play-response').disabled = true;
+    document.getElementById('btn-confirmar').disabled = true;
+    document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
+    document.getElementById('btn-siguiente').disabled = false;
 
-    // Si es experto y es la primera pregunta del ítem, cargar el previo (i#.mp3)
+    document.getElementById('context-audio').removeAttribute('src');
+    document.getElementById('context-audio').load();
+    const tb = document.getElementById('transcription-box');
+    tb.value = '';
+    tb.placeholder = 'Verifique y corrija su respuesta acá si es necesario...';
+
+    // Lógica para expertos: reproducir el preámbulo (Ítem)
     if (state.role === 'experto' && subIdx === 0) {
+        try {
+            const res = await fetch(`${API_BASE}/item/${itemNum}?lang=${state.lang}`);
+            const data = await res.json();
+            document.getElementById('instruction-text').innerHTML = `
+                <strong>Ítem ${itemNum}:</strong> ${data.titulo}.<br>
+                Escuche el contexto y luego responda las preguntas.
+            `;
+        } catch (e) {
+            document.getElementById('instruction-text').textContent = `Ítem ${itemNum}: Cargando...`;
+        }
+        // Reproducir el audio del ítem (previo)
         const itemAudio = `${API_BASE}/audio/item/${itemNum}`;
-        document.getElementById('audio-player').src = itemAudio;
-        document.getElementById('audio-player').load();
-        // Se reproducirá el previo y luego la pregunta
+        document.getElementById('context-audio').src = itemAudio;
+        document.getElementById('context-audio').load();
+        const player = document.getElementById('context-audio');
+        player.onended = () => {
+            cargarPreguntaReal(itemNum, subIdx, globalIdx);
+        };
+        player.onerror = () => {
+            // Si falla el audio, desbloquear para que pueda responder con texto
+            document.getElementById('btn-record').disabled = false;
+            document.getElementById('btn-play-response').disabled = false;
+            document.getElementById('btn-confirmar').disabled = false;
+            mostrarStatus('No se pudo cargar el audio del ítem. Puede responder por texto.', 'info');
+        };
+        return;
     }
 
-    // Cargar texto de la pregunta
-    const res = await fetch(`${API_BASE}/pregunta/${globalIdx}?lang=${state.lang}`);
-    const data = await res.json();
-    document.getElementById('pregunta-texto').textContent = data.texto;
-
-    // Actualizar progreso
-    actualizarProgreso();
-    document.getElementById('transcription-box').value = '';
-    document.getElementById('btn-grabar').disabled = false;
-    document.getElementById('btn-detener').disabled = true;
-    document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
+    // Si no es experto o no es inicio, cargar pregunta directamente
+    cargarPreguntaReal(itemNum, subIdx, globalIdx);
 }
 
-// ------------------------------------------------------------------
-// ACTUALIZACIÓN DE PROGRESO
-// ------------------------------------------------------------------
-function actualizarProgreso() {
-    const container = document.getElementById('progress-steps');
-    container.innerHTML = '';
-    state.items.forEach((item, idx) => {
-        const step = document.createElement('span');
-        step.className = 'step';
-        if (idx < state.currentItemIdx) step.classList.add('done');
-        if (idx === state.currentItemIdx) step.classList.add('active');
-        step.textContent = `Ítem ${item}`;
-        container.appendChild(step);
-    });
+async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
+    const audioUrl = `${API_BASE}/audio/pregunta/${globalIdx}`;
+    document.getElementById('context-audio').src = audioUrl;
+    document.getElementById('context-audio').load();
+
+    try {
+        const res = await fetch(`${API_BASE}/pregunta/${globalIdx}?lang=${state.lang}`);
+        const data = await res.json();
+        document.getElementById('instruction-text').innerHTML = data.texto;
+    } catch (e) {
+        document.getElementById('instruction-text').textContent = 'Error al cargar la pregunta.';
+    }
+
+    const player = document.getElementById('context-audio');
+    player.onended = () => {
+        state.isPlaying = false;
+        document.getElementById('btn-record').disabled = false;
+        document.getElementById('btn-play-response').disabled = false;
+        document.getElementById('btn-confirmar').disabled = false;
+        mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
+    };
+    player.onerror = () => {
+        // Si falla el audio, desbloquear para que pueda responder con texto
+        document.getElementById('btn-record').disabled = false;
+        document.getElementById('btn-play-response').disabled = false;
+        document.getElementById('btn-confirmar').disabled = false;
+        mostrarStatus('No se pudo cargar el audio de la pregunta. Puede responder por texto.', 'info');
+    };
+
+    actualizarHexagono();
+    mostrarStatus('', '');
 }
 
-// ------------------------------------------------------------------
-// GRABACIÓN DE AUDIO / VIDEO
-// ------------------------------------------------------------------
+function actualizarHexagono() {
+    const hexLabel = document.getElementById('hex-label-text');
+    const itemNum = state.currentItemIdx + 1;
+    const subNum = state.currentSubIdx + 1;
+    const sufijos = ['RA', 'DA', 'RA'];
+    hexLabel.textContent = `${subNum}${sufijos[subNum-1]} PREGUNTA`;
+    for (let i = 1; i <= 6; i++) {
+        const side = document.getElementById(`side-${i}`);
+        side.classList.toggle('active', i === itemNum);
+    }
+}
+
 async function toggleRecording() {
     if (state.isRecording) {
         stopRecording();
@@ -212,46 +259,31 @@ async function toggleRecording() {
 
 async function startRecording() {
     try {
-        const constraints = state.useVideo ? { audio: true, video: true } : { audio: true };
+        const constraints = { audio: true };
         state.stream = await navigator.mediaDevices.getUserMedia(constraints);
         state.mediaRecorder = new MediaRecorder(state.stream);
         state.audioChunks = [];
-        state.videoChunks = [];
 
         state.mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) {
-                if (state.useVideo) {
-                    state.videoChunks.push(e.data);
-                } else {
-                    state.audioChunks.push(e.data);
-                }
-            }
+            if (e.data.size > 0) state.audioChunks.push(e.data);
         };
 
         state.mediaRecorder.onstop = () => {
-            if (state.useVideo) {
-                const blob = new Blob(state.videoChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                document.getElementById('video-preview').src = url;
-                document.getElementById('video-section').classList.remove('hidden');
-                document.getElementById('video-preview').play();
-            } else {
-                const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-                const url = URL.createObjectURL(blob);
-                // Opcional: reproducir audio para revisión
-            }
+            const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+            state.tieneAudio = true;
+            document.getElementById('btn-play-response').disabled = false;
+            document.getElementById('vu-meter').classList.remove('active');
         };
 
         state.mediaRecorder.start();
         state.isRecording = true;
-        document.getElementById('btn-grabar').textContent = '⏹ Detener grabación';
-        document.getElementById('btn-grabar').classList.remove('btn-primary');
-        document.getElementById('btn-grabar').classList.add('btn-red');
-        document.getElementById('btn-detener').disabled = false;
+        document.getElementById('btn-record').classList.add('recording');
+        document.getElementById('record-text').innerText = "grabando...";
+        document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('Grabando...', 'success');
     } catch (e) {
         if (e.name === 'NotAllowedError') {
-            mostrarStatus('Permiso de micrófono/cámara denegado. Revise la configuración de su navegador.', 'error');
+            mostrarStatus('Permiso de micrófono denegado.', 'error');
         } else {
             mostrarStatus('Error al iniciar la grabación.', 'error');
         }
@@ -261,69 +293,93 @@ async function startRecording() {
 function stopRecording() {
     if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
         state.mediaRecorder.stop();
-        state.isRecording = false;
-        document.getElementById('btn-grabar').textContent = '🎙️ Grabar respuesta';
-        document.getElementById('btn-grabar').classList.remove('btn-red');
-        document.getElementById('btn-grabar').classList.add('btn-primary');
-        document.getElementById('btn-detener').disabled = true;
-        mostrarStatus('Grabación finalizada.', 'success');
     }
+    state.isRecording = false;
+    document.getElementById('btn-record').classList.remove('recording');
+    document.getElementById('record-text').innerText = "grabar su opinión";
+    mostrarStatus('Grabación finalizada.', 'success');
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
         state.stream = null;
     }
 }
 
-// ------------------------------------------------------------------
-// NAVEGACIÓN ENTRE PREGUNTAS
-// ------------------------------------------------------------------
+function playResponse() {
+    if (state.audioChunks.length === 0) {
+        mostrarStatus('No hay respuesta grabada para reproducir.', 'error');
+        return;
+    }
+    const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.play();
+}
+
+async function confirmarEnvio() {
+    if (state.isRecording) {
+        mostrarStatus('Por favor detenga la grabación antes de confirmar.', 'error');
+        return;
+    }
+    const respuesta = document.getElementById('transcription-box').value.trim();
+    if (!respuesta && !state.tieneAudio) {
+        mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
+        return;
+    }
+    const guardado = await guardarRespuesta(respuesta);
+    if (!guardado) {
+        mostrarStatus('No se pudo guardar la respuesta.', 'error');
+        return;
+    }
+    const itemIdx = state.currentItemIdx;
+    const subIdx = state.currentSubIdx;
+    if (subIdx < 2) {
+        state.currentSubIdx++;
+    } else if (itemIdx < state.items.length - 1) {
+        state.currentItemIdx++;
+        state.currentSubIdx = 0;
+    } else {
+        mostrarStatus('🎉 Entrevista completada. ¡Gracias por participar!', 'success');
+        document.getElementById('btn-confirmar').disabled = true;
+        document.getElementById('btn-siguiente').disabled = true;
+        return;
+    }
+    cargarPregunta();
+    mostrarStatus('', '');
+}
+
 async function navegar(direccion) {
     if (state.isRecording) {
         mostrarStatus('Por favor detenga la grabación antes de avanzar.', 'error');
         return;
     }
-
-    const respuesta = document.getElementById('transcription-box').value;
-    if (!respuesta.trim()) {
-        mostrarStatus('Por favor escriba o grabe una respuesta antes de continuar.', 'error');
-        return;
-    }
-
-    // Guardar respuesta
-    await guardarRespuesta(respuesta);
-
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
-
     if (direccion === 1) {
         if (subIdx < 2) {
             state.currentSubIdx++;
+            cargarPregunta();
         } else if (itemIdx < state.items.length - 1) {
             state.currentItemIdx++;
             state.currentSubIdx = 0;
+            cargarPregunta();
         } else {
-            mostrarStatus('🎉 Entrevista completada. ¡Gracias por participar!', 'success');
-            document.getElementById('btn-siguiente').disabled = true;
-            return;
+            mostrarStatus('Ya está en la última pregunta.', 'info');
         }
     } else if (direccion === -1) {
         if (subIdx > 0) {
             state.currentSubIdx--;
+            cargarPregunta();
         } else if (itemIdx > 0) {
             state.currentItemIdx--;
             state.currentSubIdx = 2;
+            cargarPregunta();
         } else {
-            return;
+            mostrarStatus('Ya está en la primera pregunta.', 'info');
         }
     }
-
-    cargarPregunta();
     mostrarStatus('', '');
 }
 
-// ------------------------------------------------------------------
-// GUARDAR RESPUESTA EN LA API
-// ------------------------------------------------------------------
 async function guardarRespuesta(respuesta) {
     const formData = new FormData();
     formData.append('sessionId', state.sessionId);
@@ -332,46 +388,29 @@ async function guardarRespuesta(respuesta) {
     formData.append('transcripcion', respuesta);
     formData.append('perfil', state.role);
     formData.append('lang', state.lang);
-
-    // Adjuntar audio o video si se grabó
-    if (state.useVideo && state.videoChunks.length > 0) {
-        const blob = new Blob(state.videoChunks, { type: 'video/webm' });
-        formData.append('video', blob, 'respuesta.webm');
-    } else if (state.audioChunks.length > 0) {
+    if (state.audioChunks.length > 0) {
         const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
         formData.append('audio', blob, 'respuesta.webm');
     }
-
     try {
-        const res = await fetch(`${API_BASE}/respuesta`, {
-            method: 'POST',
-            body: formData
-        });
-        if (!res.ok) throw new Error('Error al guardar');
+        const res = await fetch(`${API_BASE}/respuesta`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         state.audioChunks = [];
-        state.videoChunks = [];
+        return true;
     } catch (e) {
-        mostrarStatus('Error al guardar la respuesta.', 'error');
+        console.error('Error al guardar la respuesta:', e);
+        return false;
     }
 }
 
-// ------------------------------------------------------------------
-// MENSAJES DE ESTADO
-// ------------------------------------------------------------------
 function mostrarStatus(msg, type) {
     const el = document.getElementById('status-msg');
-    if (!msg) {
-        el.classList.add('hidden');
-        return;
-    }
+    if (!msg) { el.classList.add('hidden'); return; }
     el.textContent = msg;
     el.className = 'status-msg ' + (type || '');
     el.classList.remove('hidden');
 }
 
-// ------------------------------------------------------------------
-// PANEL DE INVESTIGADOR
-// ------------------------------------------------------------------
 async function accederDashboard() {
     const clave = document.getElementById('clave-investigador').value;
     if (clave !== '5656') {
@@ -387,9 +426,20 @@ async function cargarDashboard() {
         const res = await fetch(`${API_BASE}/admin/dashboard`);
         const data = await res.json();
         document.getElementById('dashboard-stats').innerHTML = `
-            <p><strong>Total respuestas:</strong> ${data.totalRespuestas}</p>
-            <p><strong>Total sesiones:</strong> ${data.totalSesiones}</p>
-            <p><strong>Videos pendientes:</strong> ${data.videosPendientes}</p>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
+                    <h4 style="color: #90e0ef; margin: 0;">📝 Respuestas</h4>
+                    <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.totalRespuestas}</p>
+                </div>
+                <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
+                    <h4 style="color: #90e0ef; margin: 0;">👤 Sesiones</h4>
+                    <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.totalSesiones}</p>
+                </div>
+                <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
+                    <h4 style="color: #90e0ef; margin: 0;">🎥 Videos pendientes</h4>
+                    <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.videosPendientes}</p>
+                </div>
+            </div>
         `;
     } catch (e) {
         document.getElementById('dashboard-stats').textContent = 'Error cargando datos.';
@@ -416,9 +466,6 @@ async function sincronizarVideos() {
     btn.textContent = '🔁 Sincronizar videos pendientes';
 }
 
-// ------------------------------------------------------------------
-// INICIALIZACIÓN
-// ------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-    showView('view-home');
+    document.getElementById('view-portada').classList.remove('hidden');
 });
