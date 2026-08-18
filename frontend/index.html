@@ -189,13 +189,15 @@
                             <line id="side-5" class="hex-side" x1="15" y1="70" x2="15" y2="30" />
                             <line id="side-6" class="hex-side" x1="15" y1="30" x2="50" y2="10" />
                         </svg>
-                        <div class="hex-label" id="hex-label-text">1RA PREGUNTA</div>
+                        <div class="hex-label" id="hex-label-text">1RA ÍTEM</div>
                     </div>
                 </div>
 
                 <!-- Reproductor de Audio Contextual -->
                 <div class="audio-player-box" style="background: #ffffff; border-radius: 8px; padding: 10px 15px; display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                    <audio id="context-audio" controls style="width: 100%;"></audio>
+                    <audio id="context-audio" controls preload="auto" style="width: 100%;">
+                        Su navegador no soporta elementos de audio.
+                    </audio>
                 </div>
 
                 <!-- Botones de Interacción de Voz -->
@@ -415,8 +417,7 @@
             document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
             document.getElementById('btn-siguiente').disabled = false;
 
-            document.getElementById('context-audio').removeAttribute('src');
-            document.getElementById('context-audio').load();
+            const ca = document.getElementById('context-audio'); ca.pause(); ca.removeAttribute('src'); ca.load();
             const tb = document.getElementById('transcription-box');
             tb.value = '';
             tb.placeholder = 'Verifique y corrija su respuesta acá si es necesario...';
@@ -442,11 +443,10 @@
                     cargarPreguntaReal(itemNum, subIdx, globalIdx);
                 };
                 player.onerror = () => {
-                    // Si falla el audio, desbloquear para que pueda responder con texto
-                    document.getElementById('btn-record').disabled = false;
-                    document.getElementById('btn-play-response').disabled = false;
-                    document.getElementById('btn-confirmar').disabled = false;
-                    mostrarStatus('No se pudo cargar el audio del ítem. Puede responder por texto.', 'info');
+                    if (!player.getAttribute('src')) return;
+                    console.error('No se pudo cargar el audio del ítem:', player.src);
+                    mostrarStatus('No se pudo cargar el audio de contexto. Continuando con la pregunta...', 'error');
+                    cargarPreguntaReal(itemNum, subIdx, globalIdx);
                 };
                 return;
             }
@@ -477,11 +477,12 @@
                 mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
             };
             player.onerror = () => {
-                // Si falla el audio, desbloquear para que pueda responder con texto
+                if (!player.getAttribute('src')) return;
+                console.error('No se pudo cargar el audio de la pregunta:', player.src);
                 document.getElementById('btn-record').disabled = false;
                 document.getElementById('btn-play-response').disabled = false;
                 document.getElementById('btn-confirmar').disabled = false;
-                mostrarStatus('No se pudo cargar el audio de la pregunta. Puede responder por texto.', 'info');
+                mostrarStatus('No se pudo cargar el audio. Puede leer la pregunta y responder igualmente.', 'error');
             };
 
             actualizarHexagono();
