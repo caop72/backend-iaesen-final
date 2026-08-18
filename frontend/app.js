@@ -1,4 +1,4 @@
-// app.js - Versión final con transcripción corregida y todas las mejoras de UX
+// app.js - Versión con correcciones para móviles (botón mantener presionado, transcripción reforzada, Sheets directo)
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -19,7 +19,8 @@ let state = {
     isPlaying: false,
     recognition: null,
     isRecognizing: false,
-    stream: null
+    stream: null,
+    isPlayingResponse: false
 };
 
 document.getElementById('lang-selector').addEventListener('change', (e) => {
@@ -170,7 +171,6 @@ async function cargarPregunta() {
     tb.value = '';
     tb.placeholder = 'Verifique y corrija su respuesta acá si es necesario...';
 
-    // Lógica para expertos: reproducir el preámbulo (Ítem)
     if (state.role === 'experto' && subIdx === 0) {
         try {
             const res = await fetch(`${API_BASE}/item/${itemNum}?lang=${state.lang}`);
@@ -182,7 +182,6 @@ async function cargarPregunta() {
         } catch (e) {
             document.getElementById('instruction-text').textContent = `Ítem ${itemNum}: Cargando...`;
         }
-        // Reproducir el audio del ítem (previo)
         const itemAudio = `${API_BASE}/audio/item/${itemNum}`;
         document.getElementById('context-audio').src = itemAudio;
         document.getElementById('context-audio').load();
@@ -191,7 +190,6 @@ async function cargarPregunta() {
             cargarPreguntaReal(itemNum, subIdx, globalIdx);
         };
         player.onerror = () => {
-            // Si falla el audio, desbloquear para que pueda responder con texto
             document.getElementById('btn-record').disabled = false;
             document.getElementById('btn-play-response').disabled = false;
             document.getElementById('btn-confirmar').disabled = false;
@@ -200,7 +198,6 @@ async function cargarPregunta() {
         return;
     }
 
-    // Si no es experto o no es inicio, cargar pregunta directamente
     cargarPreguntaReal(itemNum, subIdx, globalIdx);
 }
 
@@ -226,7 +223,6 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
     };
     player.onerror = () => {
-        // Si falla el audio, desbloquear para que pueda responder con texto
         document.getElementById('btn-record').disabled = false;
         document.getElementById('btn-play-response').disabled = false;
         document.getElementById('btn-confirmar').disabled = false;
@@ -249,12 +245,83 @@ function actualizarHexagono() {
     }
 }
 
-async function toggleRecording() {
-    if (state.isRecording) {
-        stopRecording();
-        return;
-    }
-    await startRecording();
+// Botón de grabar estilo "mantener presionado" (como Telegram/WhatsApp)
+let holdTimer = null;
+let isHolding = false;
+
+function setupRecordButton() {
+    const btn = document.getElementById('btn-record');
+    
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (btn.disabled) return;
+        isHolding = true;
+        holdTimer = setTimeout(() => {
+            if (isHolding) {
+                startRecording();
+                btn.classList.add('recording');
+                document.getElementById('record-text').innerText = "grabando...";
+                document.getElementById('vu-meter').classList.add('active');
+            }
+        }, 300); // 300ms de espera para evitar activaciones accidentales
+    });
+
+    btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        isHolding = false;
+        if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+        }
+        if (state.isRecording) {
+            stopRecording();
+            btn.classList.remove('recording');
+            document.getElementById('record-text').innerText = "grabar su opinión";
+            document.getElementById('vu-meter').classList.remove('active');
+        }
+    });
+
+    // Soporte para mouse (escritorio)
+    btn.addEventListener('mousedown', (e) => {
+        if (btn.disabled) return;
+        isHolding = true;
+        holdTimer = setTimeout(() => {
+            if (isHolding) {
+                startRecording();
+                btn.classList.add('recording');
+                document.getElementById('record-text').innerText = "grabando...";
+                document.getElementById('vu-meter').classList.add('active');
+            }
+        }, 300);
+    });
+
+    btn.addEventListener('mouseup', (e) => {
+        isHolding = false;
+        if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+        }
+        if (state.isRecording) {
+            stopRecording();
+            btn.classList.remove('recording');
+            document.getElementById('record-text').innerText = "grabar su opinión";
+            document.getElementById('vu-meter').classList.remove('active');
+        }
+    });
+
+    btn.addEventListener('mouseleave', (e) => {
+        isHolding = false;
+        if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+        }
+        if (state.isRecording) {
+            stopRecording();
+            btn.classList.remove('recording');
+            document.getElementById('record-text').innerText = "grabar su opinión";
+            document.getElementById('vu-meter').classList.remove('active');
+        }
+    });
 }
 
 async function startRecording() {
@@ -272,15 +339,13 @@ async function startRecording() {
             const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
             state.tieneAudio = true;
             document.getElementById('btn-play-response').disabled = false;
-            document.getElementById('vu-meter').classList.remove('active');
+            mostrarStatus('Grabación finalizada.', 'success');
         };
 
         state.mediaRecorder.start();
         state.isRecording = true;
-        document.getElementById('btn-record').classList.add('recording');
-        document.getElementById('record-text').innerText = "grabando...";
-        document.getElementById('vu-meter').classList.add('active');
-        mostrarStatus('Grabando...', 'success');
+
+        iniciarReconocimiento();
     } catch (e) {
         if (e.name === 'NotAllowedError') {
             mostrarStatus('Permiso de micrófono denegado.', 'error');
@@ -294,17 +359,96 @@ function stopRecording() {
     if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
         state.mediaRecorder.stop();
     }
-    state.isRecording = false;
-    document.getElementById('btn-record').classList.remove('recording');
-    document.getElementById('record-text').innerText = "grabar su opinión";
-    mostrarStatus('Grabación finalizada.', 'success');
-    if (state.stream) {
-        state.stream.getTracks().forEach(track => track.stop());
-        state.stream = null;
+    if (state.recognition && state.isRecognizing) {
+        state.recognition.stop();
+        state.isRecognizing = false;
     }
+    state.isRecording = false;
+}
+
+function iniciarReconocimiento() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        mostrarStatus('Este navegador no soporta reconocimiento de voz.', 'error');
+        return;
+    }
+
+    const idiomas = ['es-VE', 'es-419', 'es-ES'];
+    let lang = idiomas.find(l => {
+        try {
+            const test = new SpeechRecognition();
+            test.lang = l;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }) || 'es-ES';
+
+    state.recognition = new SpeechRecognition();
+    state.recognition.lang = lang;
+    state.recognition.continuous = true;
+    state.recognition.interimResults = true;
+    state.recognition.maxAlternatives = 1;
+
+    state.recognition.onstart = () => {
+        state.isRecognizing = true;
+        console.log('Reconocimiento iniciado con idioma:', lang);
+    };
+
+    state.recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalChunk = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalChunk += transcript;
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+
+        if (finalChunk) {
+            state.transcripcion = (state.transcripcion || '') + ' ' + finalChunk.trim();
+        }
+
+        const tb = document.getElementById('transcription-box');
+        if (!tb) return;
+
+        const textoActual = (state.transcripcion || '').trim();
+        const textoCompleto = interimTranscript 
+            ? `${textoActual} ${interimTranscript}`.trim() 
+            : textoActual;
+
+        tb.value = textoCompleto;
+        tb.scrollTop = tb.scrollHeight;
+    };
+
+    state.recognition.onerror = (event) => {
+        console.error('SpeechRecognition error:', event.error, event.message);
+        const mensajes = {
+            'not-allowed': 'El navegador bloqueó el acceso al reconocimiento de voz.',
+            'audio-capture': 'No se detectó un micrófono disponible.',
+            'no-speech': 'No se detectó voz.',
+            'network': 'El servicio de reconocimiento no está disponible.',
+            'language-not-supported': 'El idioma seleccionado no es compatible.'
+        };
+        mostrarStatus(mensajes[event.error] || `Error desconocido: ${event.error}`, 'error');
+    };
+
+    state.recognition.onend = () => {
+        state.isRecognizing = false;
+        console.log('Reconocimiento finalizado');
+    };
+
+    state.recognition.start();
 }
 
 function playResponse() {
+    if (state.isPlayingResponse) {
+        mostrarStatus('Ya está reproduciendo una respuesta.', 'info');
+        return;
+    }
     if (state.audioChunks.length === 0) {
         mostrarStatus('No hay respuesta grabada para reproducir.', 'error');
         return;
@@ -312,6 +456,12 @@ function playResponse() {
     const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    
+    state.isPlayingResponse = true;
+    audio.onended = () => {
+        state.isPlayingResponse = false;
+        URL.revokeObjectURL(url);
+    };
     audio.play();
 }
 
@@ -327,7 +477,7 @@ async function confirmarEnvio() {
     }
     const guardado = await guardarRespuesta(respuesta);
     if (!guardado) {
-        mostrarStatus('No se pudo guardar la respuesta.', 'error');
+        mostrarStatus('Error al guardar la respuesta. Intente nuevamente.', 'error');
         return;
     }
     const itemIdx = state.currentItemIdx;
@@ -395,6 +545,11 @@ async function guardarRespuesta(respuesta) {
     try {
         const res = await fetch(`${API_BASE}/respuesta`, { method: 'POST', body: formData });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.status === 'saved_with_warning') {
+            mostrarStatus('Respuesta guardada, pero hubo un problema con Sheets.', 'error');
+            return false;
+        }
         state.audioChunks = [];
         return true;
     } catch (e) {
@@ -468,4 +623,5 @@ async function sincronizarVideos() {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('view-portada').classList.remove('hidden');
+    setupRecordButton();
 });

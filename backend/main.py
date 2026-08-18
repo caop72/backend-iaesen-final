@@ -1,16 +1,19 @@
-# main.py - Versión definitiva con sincronización real a Google Sheets
 import os
 import sqlite3
 import uuid
 import json
 import datetime
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import aiofiles
 from typing import Optional
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -49,7 +52,6 @@ def init_db():
         item_idx INTEGER,
         sub_idx INTEGER,
         audio_path TEXT,
-        video_path TEXT,
         transcripcion TEXT,
         lang TEXT,
         sync_status TEXT DEFAULT 'pending',
@@ -86,48 +88,41 @@ def obtener_servicio_sheets():
     )
     return build("sheets", "v4", credentials=credentials, cache_discovery=False)
 
-def sincronizar_respuesta(respuesta_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''SELECT sesion_id, item_idx, sub_idx, transcripcion, audio_path, video_path 
-                 FROM respuestas WHERE id = ?''', (respuesta_id,))
-    row = c.fetchone()
-    conn.close()
-    if not row:
-        return
-    sesion_id, item_idx, sub_idx, transcripcion, audio_path, video_path = row
+def escribir_en_sheets(sessionId, itemIdx, subIdx, transcripcion, perfil, lang, audio_path):
     try:
         service = obtener_servicio_sheets()
         sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
-        # Obtener el nombre de la primera pestaña automáticamente
         sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheet_name = sheet_metadata['sheets'][0]['properties']['title']
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''SELECT s.nombre, s.email, s.grado, s.cargo, s.institucion, s.perfil, s.codigo, s.ambito 
+                     FROM sesiones s WHERE s.id = ?''', (sessionId,))
+        row = c.fetchone()
+        conn.close()
+        
+        nombre, email, grado, cargo, institucion, perfil, codigo, ambito = (row if row else ("", "", "", "", "", "", "", ""))
+        
         valores = [[
-            sesion_id, item_idx + 1, sub_idx + 1, transcripcion,
-            audio_path or "", video_path or "",
+            nombre or "", email or "", grado or "", cargo or "", institucion or "",
+            perfil or "", codigo or "", ambito or "",
+            "Técnica-Cibernética", itemIdx + 1,
+            f"Pregunta {itemIdx + 1}", transcripcion or "",
             datetime.datetime.now().isoformat()
         ]]
+        
         service.spreadsheets().values().append(
             spreadsheetId=sheet_id,
-            range=f"{sheet_name}!A:G",
+            range=f"{sheet_name}!A:M",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": valores}
         ).execute()
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''UPDATE respuestas SET sync_status = 'synced', synced_at = ? WHERE id = ?''',
-                  (datetime.datetime.now().isoformat(), respuesta_id))
-        conn.commit()
-        conn.close()
+        return True
     except Exception as e:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''UPDATE respuestas SET sync_status = 'failed', sync_error = ? WHERE id = ?''',
-                  (str(e), respuesta_id))
-        conn.commit()
-        conn.close()
-        raise e
+        logger.error(f"Error escribiendo en Sheets: {str(e)}")
+        return False
 
 # ------------------------------------------------------------------
 # ENDPOINTS DE LA API
@@ -215,7 +210,6 @@ async def get_pregunta(numero: int, lang: str = "es-VE"):
 
 @app.post("/api/respuesta")
 async def guardar_respuesta(
-    background_tasks: BackgroundTasks,
     sessionId: str = Form(...),
     itemIdx: int = Form(...),
     subIdx: int = Form(...),
@@ -226,11 +220,13 @@ async def guardar_respuesta(
 ):
     if not transcripcion.strip() and audio is None:
         raise HTTPException(422, "Respuesta vacía")
+    
     audio_path = None
     if audio:
         audio_path = f"/data/audios_respuestas/{sessionId}_{itemIdx}_{subIdx}_audio.webm"
         async with aiofiles.open(audio_path, 'wb') as f:
             await f.write(await audio.read())
+
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO respuestas 
@@ -240,11 +236,14 @@ async def guardar_respuesta(
     respuesta_id = c.lastrowid
     conn.commit()
     conn.close()
-    background_tasks.add_task(sincronizar_respuesta, respuesta_id)
+
+    # Sincronización directa con Sheets (sin BackgroundTasks)
+    exito = escribir_en_sheets(sessionId, itemIdx, subIdx, transcripcion, perfil, lang, audio_path)
+    
     return JSONResponse({
-        "status": "saved",
+        "status": "saved" if exito else "saved_with_warning",
         "respuesta_id": respuesta_id,
-        "sync_status": "queued"
+        "sync_status": "synced" if exito else "failed"
     })
 
 @app.get("/api/admin/dashboard")
@@ -266,49 +265,7 @@ async def dashboard():
 
 @app.post("/api/admin/sincronizar_videos")
 async def sincronizar_videos():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''SELECT id FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' LIMIT 100''')
-    pendientes = [row[0] for row in c.fetchall()]
-    conn.close()
-    for pid in pendientes:
-        try:
-            sincronizar_respuesta(pid)
-        except:
-            pass
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' ''')
-    restantes = c.fetchone()[0]
-    conn.close()
-    return JSONResponse({
-        "mensaje": f"Procesados {len(pendientes)} registros. Pendientes: {restantes}."
-    })
-
-# ==========================================
-# ENDPOINT DE PRUEBA PARA GOOGLE SHEETS
-# ==========================================
-@app.get("/api/admin/test-sheets")
-async def test_sheets():
-    try:
-        service = obtener_servicio_sheets()
-        sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
-        
-        # Obtener el nombre de la primera pestaña automáticamente
-        sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
-        sheet_name = sheet_metadata['sheets'][0]['properties']['title']
-        
-        body = {"values": [["PRUEBA", "Sincronización manual", datetime.datetime.now().isoformat()]]}
-        service.spreadsheets().values().append(
-            spreadsheetId=sheet_id,
-            range=f"{sheet_name}!A:C",
-            valueInputOption="USER_ENTERED",
-            insertDataOption="INSERT_ROWS",
-            body=body
-        ).execute()
-        return JSONResponse({"status": "ok", "mensaje": f"Conexión exitosa. Fila agregada en pestaña '{sheet_name}'."})
-    except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+    return JSONResponse({"mensaje": "Sincronización manual no disponible en esta versión."})
 
 if __name__ == "__main__":
     import uvicorn
