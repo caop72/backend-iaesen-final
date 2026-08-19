@@ -96,15 +96,16 @@
 
         <!-- MENÚ DE TARJETAS (Roles) -->
         <div id="view-home" class="hidden">
-            <div class="card" onclick="selectRole('no_experto')" style="cursor: pointer;">
-                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="font-size: 1.8rem;">🔵</span> No experto</h2>
-                <p>Participación anónima. No se guardan datos personales.</p>
-                <button class="btn">Entrar</button>
-            </div>
+            <!-- Primero Experto, luego No experto -->
             <div class="card" onclick="selectRole('experto')" style="cursor: pointer;">
                 <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="font-size: 1.8rem;">🔴</span> Experto</h2>
                 <p>Acceso a la entrevista formal con selección de perfil.</p>
                 <button class="btn">Acceder</button>
+            </div>
+            <div class="card" onclick="selectRole('no_experto')" style="cursor: pointer;">
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="font-size: 1.8rem;">🔵</span> No experto</h2>
+                <p>Participación anónima. No se guardan datos personales.</p>
+                <button class="btn">Entrar</button>
             </div>
         </div>
 
@@ -151,7 +152,7 @@
             <button class="btn btn-secondary" onclick="mostrarMenu()">⬅ Volver al inicio</button>
         </div>
 
-        <!-- PORTAL DE ENTREVISTA (Diseño visual moderno, funcionalidad intacta) -->
+        <!-- PORTAL DE ENTREVISTA -->
         <div id="view-entrevista" class="hidden">
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px;">
