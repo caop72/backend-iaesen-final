@@ -288,6 +288,12 @@ function stopRecording() {
     document.getElementById('btn-record').classList.remove('recording');
     document.getElementById('record-text').innerText = "grabar su opinión";
     mostrarStatus('Grabación finalizada.', 'success');
+
+    // --- AGREGAR ESTAS DOS LÍNEAS ---
+    const tb = document.getElementById('transcription-box');
+    tb.placeholder = "✅ Grabación finalizada. Puede corregir, complementar o borrar y volver a grabar.";
+    // ---------------------------------
+
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
         state.stream = null;
