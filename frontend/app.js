@@ -1,4 +1,4 @@
-// app.js - Versión final con eventos táctiles y de mouse separados
+// app.js - Versión final con barra de progreso y temporizador
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -18,7 +18,11 @@ let state = {
     isPlaying: false,
     recognition: null,
     isRecognizing: false,
-    stream: null
+    stream: null,
+    touchStarted: false,
+    mouseStarted: false,
+    recordingStartTime: 0,
+    recordingTimer: null
 };
 
 function mostrarMenu() {
@@ -141,7 +145,6 @@ async function cargarPregunta() {
     const itemNum = state.items[itemIdx];
     const globalIdx = (itemIdx * 3) + subIdx + 1;
 
-    // 🔁 VERIFICAR SI YA HAY UNA RESPUESTA GUARDADA PARA ESTA PREGUNTA
     const key = `${itemIdx}_${subIdx}`;
     const respuestaGuardada = state.answers[key] || '';
 
@@ -157,12 +160,18 @@ async function cargarPregunta() {
     document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
     document.getElementById('btn-siguiente').disabled = false;
 
-    const ca = document.getElementById('context-audio'); ca.pause(); ca.removeAttribute('src'); ca.load();
+    const ca = document.getElementById('context-audio');
+    ca.pause();
+    ca.removeAttribute('src');
+    ca.load();
     const tb = document.getElementById('transcription-box');
-
-    // ✅ MOSTRAR LA RESPUESTA GUARDADA SI EXISTE
     tb.value = respuestaGuardada;
     tb.placeholder = respuestaGuardada ? '' : 'Verifique y corrija su respuesta acá si es necesario...';
+
+    // Actualizar barra de progreso
+    const totalPreguntas = state.items.length * 3;
+    const pct = ((globalIdx) / totalPreguntas) * 100;
+    document.getElementById('progress-fill').style.width = pct + '%';
 
     if (state.role === 'experto' && subIdx === 0) {
         try {
@@ -246,44 +255,56 @@ function actualizarHexagono() {
 }
 
 // ------------------------------------------------------------------
-// GRABACIÓN ESTILO "MANTENER PRESIONADO" (Eventos separados)
+// GRABACIÓN ESTILO "MANTENER PRESIONADO" (Widget mejorado)
 // ------------------------------------------------------------------
-let isPressing = false;
+function setupRecordButton() {
+    const btn = document.getElementById('btn-record');
+    
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (state.isRecording || state.touchStarted) return;
+        state.touchStarted = true;
+        startRecording();
+    }, { passive: false });
 
-// Soporte para celular (táctil)
-document.getElementById('btn-record').addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (isPressing) return;
-    isPressing = true;
-    startRecording();
-});
+    btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (state.touchStarted && state.isRecording) {
+            state.touchStarted = false;
+            stopRecording();
+        }
+    }, { passive: false });
 
-document.getElementById('btn-record').addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (!isPressing) return;
-    isPressing = false;
-    stopRecording();
-});
+    btn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        if (state.touchStarted && state.isRecording) {
+            state.touchStarted = false;
+            stopRecording();
+        }
+    }, { passive: false });
 
-// Soporte para PC (mouse)
-document.getElementById('btn-record').addEventListener('mousedown', (e) => {
-    if (isPressing) return;
-    isPressing = true;
-    startRecording();
-});
+    btn.addEventListener('mousedown', (e) => {
+        if (state.isRecording || state.mouseStarted) return;
+        state.mouseStarted = true;
+        startRecording();
+    });
 
-document.getElementById('btn-record').addEventListener('mouseup', (e) => {
-    if (!isPressing) return;
-    isPressing = false;
-    stopRecording();
-});
+    btn.addEventListener('mouseup', (e) => {
+        if (state.mouseStarted && state.isRecording) {
+            state.mouseStarted = false;
+            stopRecording();
+        }
+    });
 
-document.getElementById('btn-record').addEventListener('mouseleave', (e) => {
-    if (isPressing) {
-        isPressing = false;
-        stopRecording();
-    }
-});
+    btn.addEventListener('mouseleave', (e) => {
+        if (state.mouseStarted && state.isRecording) {
+            state.mouseStarted = false;
+            stopRecording();
+        }
+    });
+
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+}
 
 async function startRecording() {
     try {
@@ -296,21 +317,36 @@ async function startRecording() {
             if (e.data.size > 0) state.audioChunks.push(e.data);
         };
 
-        // INICIAR RECONOCIMIENTO ANTES DE GRABAR (CRÍTICO PARA MÓVILES)
-        iniciarReconocimiento();
-
         state.mediaRecorder.start();
         state.isRecording = true;
+        state.recordingStartTime = Date.now();
+
         document.getElementById('btn-record').classList.add('recording');
         document.getElementById('record-text').innerText = "grabando...";
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('Grabando...', 'success');
+
+        iniciarReconocimiento();
+
+        // Temporizador de grabación
+        if (state.recordingTimer) clearInterval(state.recordingTimer);
+        state.recordingTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+            const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const secs = String(elapsed % 60).padStart(2, '0');
+            document.getElementById('record-timer').textContent = `${mins}:${secs}`;
+        }, 500);
 
         state.mediaRecorder.onstop = () => {
             const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
             state.tieneAudio = true;
             document.getElementById('btn-play-response').disabled = false;
             document.getElementById('vu-meter').classList.remove('active');
+            document.getElementById('record-timer').textContent = '';
+            if (state.recordingTimer) {
+                clearInterval(state.recordingTimer);
+                state.recordingTimer = null;
+            }
         };
     } catch (e) {
         if (e.name === 'NotAllowedError') {
@@ -492,7 +528,6 @@ async function navegar(direccion) {
 }
 
 async function guardarRespuesta(respuesta) {
-    // Guardar la respuesta en el estado local para poder mostrarla al retroceder
     const key = `${state.currentItemIdx}_${state.currentSubIdx}`;
     state.answers[key] = respuesta;
 
@@ -527,4 +562,5 @@ function mostrarStatus(msg, type) {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('view-portada').classList.remove('hidden');
+    setupRecordButton();
 });
