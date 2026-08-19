@@ -265,6 +265,7 @@ async function startRecording() {
         document.getElementById('record-text').innerText = "grabando...";
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('Grabando...', 'success');
+        iniciarReconocimiento();
     } catch (e) {
         if (e.name === 'NotAllowedError') {
             mostrarStatus('Permiso de micrófono denegado.', 'error');
@@ -286,6 +287,87 @@ function stopRecording() {
         state.stream.getTracks().forEach(track => track.stop());
         state.stream = null;
     }
+}
+
+// ------------------------------------------------------------------
+// RECONOCIMIENTO DE VOZ (TRANSCRIPCIÓN EN TIEMPO REAL)
+// ------------------------------------------------------------------
+function iniciarReconocimiento() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        mostrarStatus('Este navegador no soporta reconocimiento de voz.', 'error');
+        return;
+    }
+
+    const idiomas = ['es-VE', 'es-419', 'es-ES'];
+    let lang = idiomas.find(l => {
+        try {
+            const test = new SpeechRecognition();
+            test.lang = l;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }) || 'es-ES';
+
+    state.recognition = new SpeechRecognition();
+    state.recognition.lang = lang;
+    state.recognition.continuous = true;
+    state.recognition.interimResults = true;
+    state.recognition.maxAlternatives = 1;
+
+    state.recognition.onstart = () => {
+        state.isRecognizing = true;
+        console.log('Reconocimiento iniciado con idioma:', lang);
+    };
+
+    state.recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalChunk = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalChunk += transcript;
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+
+        if (finalChunk) {
+            state.transcripcion = (state.transcripcion || '') + ' ' + finalChunk.trim();
+        }
+
+        const tb = document.getElementById('transcription-box');
+        if (!tb) return;
+
+        const textoActual = (state.transcripcion || '').trim();
+        const textoCompleto = interimTranscript 
+            ? `${textoActual} ${interimTranscript}`.trim() 
+            : textoActual;
+
+        tb.value = textoCompleto;
+        tb.scrollTop = tb.scrollHeight;
+    };
+
+    state.recognition.onerror = (event) => {
+        console.error('SpeechRecognition error:', event.error, event.message);
+        const mensajes = {
+            'not-allowed': 'El navegador bloqueó el acceso al reconocimiento de voz.',
+            'audio-capture': 'No se detectó un micrófono disponible.',
+            'no-speech': 'No se detectó voz.',
+            'network': 'El servicio de reconocimiento no está disponible.',
+            'language-not-supported': 'El idioma seleccionado no es compatible.'
+        };
+        mostrarStatus(mensajes[event.error] || `Error desconocido: ${event.error}`, 'error');
+    };
+
+    state.recognition.onend = () => {
+        state.isRecognizing = false;
+        console.log('Reconocimiento finalizado');
+    };
+
+    state.recognition.start();
 }
 
 function playResponse() {
