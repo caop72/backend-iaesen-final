@@ -1,10 +1,9 @@
-// app.js - Versión estable (botón de un solo toque, sin mantener presionado)
+// app.js - Lógica original intacta, adaptada al nuevo diseño visual
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
     role: null,
     sessionId: null,
-    lang: 'es-VE',
     perfil: null,
     items: [],
     currentItemIdx: 0,
@@ -19,13 +18,8 @@ let state = {
     isPlaying: false,
     recognition: null,
     isRecognizing: false,
-    stream: null,
-    isPlayingResponse: false
+    stream: null
 };
-
-document.getElementById('lang-selector').addEventListener('change', (e) => {
-    state.lang = e.target.value;
-});
 
 function mostrarMenu() {
     document.getElementById('view-portada').classList.add('hidden');
@@ -33,11 +27,7 @@ function mostrarMenu() {
 }
 
 function showView(viewId) {
-    // Ocultar TODAS las vistas primero (forzado)
-    document.querySelectorAll('.app-container > div[id^="view-"]').forEach(el => {
-        el.classList.add('hidden');
-    });
-    // Mostrar solo la vista deseada
+    document.querySelectorAll('.app-container > div[id^="view-"]').forEach(el => el.classList.add('hidden'));
     document.getElementById(viewId).classList.remove('hidden');
 }
 
@@ -52,8 +42,6 @@ function selectRole(role) {
     } else if (role === 'experto') {
         cargarPerfiles();
         showView('view-experto');
-    } else if (role === 'investigador') {
-        showView('view-investigador');
     }
 }
 
@@ -95,7 +83,6 @@ async function iniciarEntrevistaExperto() {
     }
 
     state.perfil = perfil;
-    state.lang = document.getElementById('lang-selector').value;
 
     try {
         const formData = new FormData();
@@ -106,7 +93,6 @@ async function iniciarEntrevistaExperto() {
         formData.append('cargo', cargo);
         formData.append('institucion', institucion);
         formData.append('grado', grado);
-        formData.append('lang', state.lang);
 
         const res = await fetch(`${API_BASE}/sesion`, {
             method: 'POST',
@@ -127,11 +113,9 @@ async function iniciarEntrevistaExperto() {
 }
 
 async function iniciarEntrevistaNoExperto() {
-    state.lang = document.getElementById('lang-selector').value;
     try {
         const formData = new FormData();
         formData.append('role', 'no_experto');
-        formData.append('lang', state.lang);
 
         const res = await fetch(`${API_BASE}/sesion`, {
             method: 'POST',
@@ -165,19 +149,18 @@ async function cargarPregunta() {
 
     document.getElementById('btn-record').disabled = true;
     document.getElementById('btn-play-response').disabled = true;
-    document.getElementById('btn-submit').disabled = true;
+    document.getElementById('btn-confirmar').disabled = true;
     document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
     document.getElementById('btn-siguiente').disabled = false;
 
-    document.getElementById('context-audio').removeAttribute('src');
-    document.getElementById('context-audio').load();
+    const ca = document.getElementById('context-audio'); ca.pause(); ca.removeAttribute('src'); ca.load();
     const tb = document.getElementById('transcription-box');
     tb.value = '';
     tb.placeholder = 'Verifique y corrija su respuesta acá si es necesario...';
 
     if (state.role === 'experto' && subIdx === 0) {
         try {
-            const res = await fetch(`${API_BASE}/item/${itemNum}?lang=${state.lang}`);
+            const res = await fetch(`${API_BASE}/item/${itemNum}`);
             const data = await res.json();
             document.getElementById('instruction-text').innerHTML = `
                 <strong>Ítem ${itemNum}:</strong> ${data.titulo}.<br>
@@ -194,10 +177,10 @@ async function cargarPregunta() {
             cargarPreguntaReal(itemNum, subIdx, globalIdx);
         };
         player.onerror = () => {
-            document.getElementById('btn-record').disabled = false;
-            document.getElementById('btn-play-response').disabled = false;
-            document.getElementById('btn-confirmar').disabled = false;
-            mostrarStatus('No se pudo cargar el audio del ítem. Puede responder por texto.', 'info');
+            if (!player.getAttribute('src')) return;
+            console.error('No se pudo cargar el audio del ítem:', player.src);
+            mostrarStatus('No se pudo cargar el audio de contexto. Continuando con la pregunta...', 'error');
+            cargarPreguntaReal(itemNum, subIdx, globalIdx);
         };
         return;
     }
@@ -211,7 +194,7 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
     document.getElementById('context-audio').load();
 
     try {
-        const res = await fetch(`${API_BASE}/pregunta/${globalIdx}?lang=${state.lang}`);
+        const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
         const data = await res.json();
         document.getElementById('instruction-text').innerHTML = data.texto;
     } catch (e) {
@@ -227,10 +210,12 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
     };
     player.onerror = () => {
+        if (!player.getAttribute('src')) return;
+        console.error('No se pudo cargar el audio de la pregunta:', player.src);
         document.getElementById('btn-record').disabled = false;
         document.getElementById('btn-play-response').disabled = false;
         document.getElementById('btn-confirmar').disabled = false;
-        mostrarStatus('No se pudo cargar el audio de la pregunta. Puede responder por texto.', 'info');
+        mostrarStatus('No se pudo cargar el audio. Puede leer la pregunta y responder igualmente.', 'error');
     };
 
     actualizarHexagono();
@@ -272,13 +257,14 @@ async function startRecording() {
             const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
             state.tieneAudio = true;
             document.getElementById('btn-play-response').disabled = false;
+            document.getElementById('vu-meter').classList.remove('active');
         };
 
         state.mediaRecorder.start();
         state.isRecording = true;
         document.getElementById('btn-record').classList.add('recording');
         document.getElementById('record-text').innerText = "grabando...";
-        iniciarReconocimiento();
+        document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('Grabando...', 'success');
     } catch (e) {
         if (e.name === 'NotAllowedError') {
@@ -293,10 +279,6 @@ function stopRecording() {
     if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
         state.mediaRecorder.stop();
     }
-    if (state.recognition && state.isRecognizing) {
-        state.recognition.stop();
-        state.isRecognizing = false;
-    }
     state.isRecording = false;
     document.getElementById('btn-record').classList.remove('recording');
     document.getElementById('record-text').innerText = "grabar su opinión";
@@ -307,89 +289,7 @@ function stopRecording() {
     }
 }
 
-function iniciarReconocimiento() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        mostrarStatus('Este navegador no soporta reconocimiento de voz.', 'error');
-        return;
-    }
-
-    const idiomas = ['es-VE', 'es-419', 'es-ES'];
-    let lang = idiomas.find(l => {
-        try {
-            const test = new SpeechRecognition();
-            test.lang = l;
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }) || 'es-ES';
-
-    state.recognition = new SpeechRecognition();
-    state.recognition.lang = lang;
-    state.recognition.continuous = true;
-    state.recognition.interimResults = true;
-    state.recognition.maxAlternatives = 1;
-
-    state.recognition.onstart = () => {
-        state.isRecognizing = true;
-        console.log('Reconocimiento iniciado con idioma:', lang);
-    };
-
-    state.recognition.onresult = (event) => {
-        let interimTranscript = '';
-        let finalChunk = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalChunk += transcript;
-            } else {
-                interimTranscript += transcript;
-            }
-        }
-
-        if (finalChunk) {
-            state.transcripcion = (state.transcripcion || '') + ' ' + finalChunk.trim();
-        }
-
-        const tb = document.getElementById('transcription-box');
-        if (!tb) return;
-
-        const textoActual = (state.transcripcion || '').trim();
-        const textoCompleto = interimTranscript 
-            ? `${textoActual} ${interimTranscript}`.trim() 
-            : textoActual;
-
-        tb.value = textoCompleto;
-        tb.scrollTop = tb.scrollHeight;
-    };
-
-    state.recognition.onerror = (event) => {
-        console.error('SpeechRecognition error:', event.error, event.message);
-        const mensajes = {
-            'not-allowed': 'El navegador bloqueó el acceso al reconocimiento de voz.',
-            'audio-capture': 'No se detectó un micrófono disponible.',
-            'no-speech': 'No se detectó voz.',
-            'network': 'El servicio de reconocimiento no está disponible.',
-            'language-not-supported': 'El idioma seleccionado no es compatible.'
-        };
-        mostrarStatus(mensajes[event.error] || `Error desconocido: ${event.error}`, 'error');
-    };
-
-    state.recognition.onend = () => {
-        state.isRecognizing = false;
-        console.log('Reconocimiento finalizado');
-    };
-
-    state.recognition.start();
-}
-
 function playResponse() {
-    if (state.isPlayingResponse) {
-        mostrarStatus('Ya está reproduciendo una respuesta.', 'info');
-        return;
-    }
     if (state.audioChunks.length === 0) {
         mostrarStatus('No hay respuesta grabada para reproducir.', 'error');
         return;
@@ -397,11 +297,6 @@ function playResponse() {
     const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    state.isPlayingResponse = true;
-    audio.onended = () => {
-        state.isPlayingResponse = false;
-        URL.revokeObjectURL(url);
-    };
     audio.play();
 }
 
@@ -477,7 +372,6 @@ async function guardarRespuesta(respuesta) {
     formData.append('subIdx', state.currentSubIdx);
     formData.append('transcripcion', respuesta);
     formData.append('perfil', state.role);
-    formData.append('lang', state.lang);
     if (state.audioChunks.length > 0) {
         const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
         formData.append('audio', blob, 'respuesta.webm');
@@ -499,61 +393,6 @@ function mostrarStatus(msg, type) {
     el.textContent = msg;
     el.className = 'status-msg ' + (type || '');
     el.classList.remove('hidden');
-}
-
-async function accederDashboard() {
-    const clave = document.getElementById('clave-investigador').value;
-    if (clave !== '5656') {
-        mostrarStatus('Clave incorrecta.', 'error');
-        return;
-    }
-    document.getElementById('dashboard-content').classList.remove('hidden');
-    await cargarDashboard();
-}
-
-async function cargarDashboard() {
-    try {
-        const res = await fetch(`${API_BASE}/admin/dashboard`);
-        const data = await res.json();
-        document.getElementById('dashboard-stats').innerHTML = `
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
-                    <h4 style="color: #90e0ef; margin: 0;">📝 Respuestas</h4>
-                    <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.totalRespuestas}</p>
-                </div>
-                <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
-                    <h4 style="color: #90e0ef; margin: 0;">👤 Sesiones</h4>
-                    <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.totalSesiones}</p>
-                </div>
-                <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
-                    <h4 style="color: #90e0ef; margin: 0;">🎥 Videos pendientes</h4>
-                    <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.videosPendientes}</p>
-                </div>
-            </div>
-        `;
-    } catch (e) {
-        document.getElementById('dashboard-stats').textContent = 'Error cargando datos.';
-    }
-}
-
-async function sincronizarVideos() {
-    const btn = document.querySelector('button[onclick="sincronizarVideos()"]');
-    btn.disabled = true;
-    btn.textContent = '⏳ Sincronizando...';
-    try {
-        const res = await fetch(`${API_BASE}/admin/sincronizar_videos`, { method: 'POST' });
-        const data = await res.json();
-        document.getElementById('sync-status').textContent = data.mensaje;
-        document.getElementById('sync-status').className = 'status-msg success';
-        document.getElementById('sync-status').classList.remove('hidden');
-        await cargarDashboard();
-    } catch (e) {
-        document.getElementById('sync-status').textContent = 'Error al sincronizar.';
-        document.getElementById('sync-status').className = 'status-msg error';
-        document.getElementById('sync-status').classList.remove('hidden');
-    }
-    btn.disabled = false;
-    btn.textContent = '🔁 Sincronizar videos pendientes';
 }
 
 document.addEventListener('DOMContentLoaded', () => {

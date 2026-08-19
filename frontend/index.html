@@ -8,123 +8,110 @@
     <meta name="theme-color" content="#0b132b">
     <style>
         :root {
-            --bg-primary: #0b132b;
-            --bg-card: #1c2541;
-            --text-primary: #e0f7fa;
-            --text-secondary: #90e0ef;
-            --accent-blue: #00b4d8;
-            --accent-green: #2a9d8f;
-            --accent-red: #e63946;
-            --border-color: #3a506b;
-            --shadow: 0 8px 24px rgba(0,0,0,0.5);
+            --bg-start: #1e3c72;
+            --bg-end: #2a5298;
+            --card-bg: #ffffff;
+            --text-dark: #1e3c72;
+            --text-light: #555;
+            --shadow: 0 10px 30px rgba(0,0,0,0.2);
+            --radius: 24px;
+            --radius-btn: 40px;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: var(--bg-primary); color: var(--text-primary); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font); background: linear-gradient(135deg, var(--bg-start), var(--bg-end)); min-height: 100vh; padding: 16px; display: flex; justify-content: center; align-items: center; }
         .app-container { width: 100%; max-width: 800px; margin: 0 auto; }
-        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; transition: transform 0.2s; }
-        .card:hover { transform: translateY(-4px); border-color: var(--accent-blue); }
-        .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .card-header h2 { font-size: 1.4rem; margin: 0; color: var(--text-primary); }
-        .card-header .icon { font-size: 2rem; }
-        .card p { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 16px; }
-        .btn { display: inline-block; width: 100%; padding: 14px 0; border: none; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: all 0.3s; text-align: center; color: #fff; }
+        .card { background: var(--card-bg); border-radius: var(--radius); padding: 30px 24px; box-shadow: var(--shadow); margin-bottom: 20px; transition: transform 0.2s; text-align: center; }
+        .card:hover { transform: translateY(-4px); }
+        .card h2 { color: var(--text-dark); font-size: 24px; margin-bottom: 8px; }
+        .card p { color: var(--text-light); margin-bottom: 16px; }
+        .btn { display: inline-block; width: 100%; padding: 12px 0; border: none; border-radius: var(--radius-btn); font-weight: bold; font-size: 16px; cursor: pointer; transition: all 0.2s; text-align: center; color: #fff; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
+        .btn:hover { opacity: 0.9; transform: scale(1.01); }
+        .btn:active { transform: scale(0.97); }
         .btn-primary { background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%); }
-        .btn-primary:hover { opacity: 0.9; transform: scale(1.01); }
-        .btn-green { background: linear-gradient(135deg, #2a9d8f 0%, #264653 100%); }
-        .btn-red { background: linear-gradient(135deg, #e63946 0%, #a4161a 100%); }
-        .btn-secondary { background: #3a506b; }
-        .btn-secondary:hover { background: #4a607b; }
+        .btn-green { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
         .hidden { display: none !important; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 4px; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background-color: #0b132b; color: var(--text-primary); font-size: 1rem; }
-        .form-group select option { background-color: #1c2541; }
-        .language-selector { display: flex; justify-content: flex-end; margin-bottom: 16px; }
-        .language-selector select { width: auto; padding: 8px 12px; border-radius: 8px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .form-group { margin-bottom: 16px; text-align: left; }
+        .form-group label { display: block; font-weight: bold; color: var(--text-dark); margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 12px; font-size: 16px; font-family: var(--font); }
+        .form-group select option { background-color: #fff; }
+        .status-msg { padding: 12px; border-radius: 12px; margin-top: 12px; text-align: center; font-size: 14px; }
+        .status-msg.success { background: #d4edda; color: #155724; }
+        .status-msg.error { background: #f8d7da; color: #721c24; }
+        .status-msg.info { background: #e3f2fd; color: #0b5e9e; }
         .hex-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 12px; min-width: 90px; }
         .hex-icon { width: 45px; height: 45px; }
-        .hex-label { font-size: 10px; font-weight: bold; color: var(--accent-blue); margin-top: 2px; text-align: center; }
-        .hex-side { stroke: var(--border-color); stroke-width: 5; stroke-linecap: round; transition: stroke 0.3s ease; }
-        .hex-side.active { stroke: var(--accent-red); stroke-width: 6; }
-        .audio-player-box { background: #ffffff; border-radius: 8px; padding: 10px 15px; display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .hex-label { font-size: 10px; font-weight: bold; color: var(--text-dark); margin-top: 2px; text-align: center; }
+        .hex-side { stroke: #ccc; stroke-width: 5; stroke-linecap: round; transition: stroke 0.3s ease; }
+        .hex-side.active { stroke: #ff5722; stroke-width: 6; }
+        .audio-player-box { background: #f8f9fa; border-radius: 12px; padding: 10px 15px; margin-bottom: 16px; }
         .audio-player-box audio { width: 100%; }
-        .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .btn-action { background-color: #ffffff; border: 2px solid var(--border-color); border-radius: 8px; padding: 15px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s ease; }
+        .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .btn-action { background: #f8f9fa; border: 2px solid #ced4da; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
         .btn-record { color: #333; }
-        .btn-record.recording { border-color: var(--accent-red); background-color: rgba(255, 51, 51, 0.1); color: var(--accent-red); }
-        .btn-play-response { color: #0b132b; border-color: var(--accent-blue); }
-        .vu-meter { display: none; align-items: center; gap: 3px; height: 20px; margin-left: 10px; }
+        .btn-record.recording { border-color: #dc3545; background: #fff3f3; color: #dc3545; }
+        .btn-play-response { color: #0b132b; border-color: #00b4d8; }
+        .vu-meter { display: none; align-items: center; gap: 3px; height: 20px; margin-left: 8px; }
         .vu-meter.active { display: flex; }
-        .vu-bar { width: 4px; background-color: var(--accent-red); animation: bounce 0.6s infinite alternate; border-radius: 2px; }
+        .vu-bar { width: 4px; background: #dc3545; animation: bounce 0.6s infinite alternate; border-radius: 2px; }
         .vu-bar:nth-child(2) { animation-delay: 0.1s; }
         .vu-bar:nth-child(3) { animation-delay: 0.2s; }
         .vu-bar:nth-child(4) { animation-delay: 0.3s; }
         .vu-bar:nth-child(5) { animation-delay: 0.4s; }
         @keyframes bounce { 0% { height: 4px; } 100% { height: 18px; } }
-        #transcription-box { width: 100%; height: 90px; background-color: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); padding: 12px; font-size: 14px; resize: vertical; box-sizing: border-box; margin-bottom: 20px; outline: none; }
-        #transcription-box:focus { border-color: var(--accent-blue); }
-        .footer-navigation { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
-        .nav-arrow { background: none; border: none; color: var(--accent-blue); font-size: 32px; cursor: pointer; padding: 0 10px; transition: transform 0.1s; }
-        .nav-arrow:hover { transform: scale(1.1); color: #ffffff; }
-        .btn-submit { background-color: var(--accent-blue); color: #0b132b; border: none; border-radius: 8px; padding: 12px 30px; font-size: 16px; font-weight: bold; cursor: pointer; flex-grow: 1; text-align: center; transition: background 0.2s; }
-        .btn-submit:hover { background-color: #3adefc; }
-        .home-link { display: block; text-align: center; margin-top: 15px; color: var(--text-secondary); font-size: 13px; text-decoration: none; }
-        .home-link:hover { color: var(--text-primary); text-decoration: underline; }
-        .status-msg { padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 0.9rem; text-align: center; }
-        .status-msg.success { background: rgba(42, 157, 143, 0.2); border: 1px solid var(--accent-green); color: var(--accent-green); }
-        .status-msg.error { background: rgba(230, 57, 70, 0.2); border: 1px solid var(--accent-red); color: var(--accent-red); }
-        .status-msg.info { background: rgba(0, 180, 216, 0.2); border: 1px solid var(--accent-blue); color: var(--accent-blue); }
-        @media (max-width: 480px) { .card { padding: 16px; } .nav-arrow { font-size: 24px; } .btn-submit { padding: 10px 20px; font-size: 14px; } }
+        #transcription-box { width: 100%; height: 80px; padding: 12px; border: 1px solid #ced4da; border-radius: 12px; font-size: 14px; resize: vertical; font-family: var(--font); }
+        .footer-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .nav-arrow { background: none; border: none; font-size: 28px; color: #1e3c72; cursor: pointer; padding: 0 8px; transition: transform 0.1s; }
+        .nav-arrow:hover { transform: scale(1.1); }
+        .btn-submit { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; border: none; border-radius: 12px; padding: 12px 20px; font-size: 16px; font-weight: bold; cursor: pointer; flex-grow: 1; text-align: center; }
+        .btn-submit:hover { opacity: 0.9; }
+        .home-link { display: block; text-align: center; margin-top: 12px; color: #6c757d; font-size: 13px; text-decoration: none; }
+        .home-link:hover { color: #1e3c72; text-decoration: underline; }
+        @media (max-width: 480px) { .card { padding: 20px 16px; } .action-buttons { grid-template-columns: 1fr; } .nav-arrow { font-size: 24px; } }
     </style>
 </head>
 <body>
     <div class="app-container" id="app">
-
         <!-- PORTADA INSTITUCIONAL -->
         <div id="view-portada" class="hidden">
-            <div class="card" style="text-align: center; padding: 40px 24px;">
-                <h2 style="color: var(--accent-blue); margin-bottom: 4px; font-size: 1.2rem;">INSTITUTO DE ALTOS ESTUDIOS DE SEGURIDAD DE LA NACIÓN</h2>
-                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px;">Caracas - Venezuela<br>Doctorado en Seguridad de la Nación</p>
-                <h3 style="color: #fff; font-size: 1.1rem; line-height: 1.5; margin-bottom: 16px;">
+            <div class="card" style="padding: 40px 24px;">
+                <h2 style="color: #2a5298; margin-bottom: 4px; font-size: 1.2rem;">INSTITUTO DE ALTOS ESTUDIOS DE SEGURIDAD DE LA NACIÓN</h2>
+                <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px;">Caracas - Venezuela<br>Doctorado en Seguridad de la Nación</p>
+                <h3 style="color: #1e3c72; font-size: 1.1rem; line-height: 1.5; margin-bottom: 16px;">
                     “Modelo epistémico aplicado a un Sistema Cibernético Complejo<br>
                     para la conformación de un esquema Praxiológico de Defensa Soterrada<br>
                     en el marco de la Seguridad de la Nación”
                 </h3>
-                <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 4px;">
-                    <strong>Investigador:</strong> Cnel. César Augusto Ontivero Pérez
-                </p>
-                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px; line-height: 1.4;">
+                <p style="color: #555; font-size: 0.95rem; margin-bottom: 4px;"><strong>Investigador:</strong> Cnel. César Augusto Ontivero Pérez</p>
+                <p style="color: #666; font-size: 0.85rem; margin-bottom: 20px; line-height: 1.4;">
                     Esta entrevista forma parte de una investigación doctoral.<br>
                     Su participación es voluntaria y sus respuestas serán tratadas con estricta confidencialidad.<br>
                     El tiempo estimado de la entrevista es de 30 a 60 minutos.
                 </p>
-                <button class="btn btn-primary" onclick="mostrarMenu()" style="max-width: 300px; margin: 0 auto;">➡️ Comenzar</button>
+                <button class="btn" onclick="mostrarMenu()" style="max-width: 300px; margin: 0 auto;">➡️ Comenzar</button>
             </div>
         </div>
 
         <!-- MENÚ DE TARJETAS (Roles) -->
         <div id="view-home" class="hidden">
-            <div class="card" onclick="selectRole('no_experto')">
-                <div class="card-header"><span class="icon">🔵</span><h2>No experto</h2></div>
+            <div class="card" onclick="selectRole('no_experto')" style="cursor: pointer;">
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="font-size: 1.8rem;">🔵</span> No experto</h2>
                 <p>Participación anónima. No se guardan datos personales.</p>
-                <button class="btn btn-primary">Entrar</button>
+                <button class="btn">Entrar</button>
             </div>
-            <div class="card" onclick="selectRole('experto')">
-                <div class="card-header"><span class="icon">🔴</span><h2>Experto</h2></div>
+            <div class="card" onclick="selectRole('experto')" style="cursor: pointer;">
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="font-size: 1.8rem;">🔴</span> Experto</h2>
                 <p>Acceso a la entrevista formal con selección de perfil.</p>
-                <button class="btn btn-primary">Acceder</button>
-            </div>
-            <div class="card" onclick="selectRole('investigador')">
-                <div class="card-header"><span class="icon">🟢</span><h2>Investigador</h2></div>
-                <p>Dashboard de avances y sincronización de videos.</p>
-                <button class="btn btn-primary">Panel</button>
+                <button class="btn">Acceder</button>
             </div>
         </div>
 
         <!-- REGISTRO EXPERTO -->
         <div id="view-experto" class="hidden">
             <div class="card">
-                <h2 style="color: var(--accent-blue); margin-bottom: 16px;">🔴 Registro de Experto</h2>
+                <h2 style="color: #1e3c72; margin-bottom: 16px;">🔴 Registro de Experto</h2>
                 <div class="form-group">
                     <label>Seleccione su perfil</label>
                     <select id="perfil-experto">
@@ -148,7 +135,7 @@
                     <div class="form-group"><label>Correo Electrónico</label><input type="email" id="email" placeholder="ejemplo@correo.com"></div>
                     <div class="form-group"><label>Cargo u Oficio</label><input type="text" id="cargo" placeholder="Ej: Director de Planificación"></div>
                     <div class="form-group"><label>Institución</label><input type="text" id="institucion" value="FANB"></div>
-                    <button class="btn btn-green" onclick="iniciarEntrevistaExperto()" style="margin-top: 12px;">🚀 Iniciar Entrevista</button>
+                    <button class="btn btn-primary" onclick="iniciarEntrevistaExperto()" style="margin-top: 12px;">🚀 Iniciar Entrevista</button>
                 </div>
             </div>
             <button class="btn btn-secondary" onclick="mostrarMenu()">⬅ Volver al inicio</button>
@@ -157,20 +144,19 @@
         <!-- REGISTRO NO EXPERTO -->
         <div id="view-no-experto" class="hidden">
             <div class="card">
-                <h2 style="color: var(--accent-blue);">🔵 No experto</h2>
-                <p style="color: var(--text-secondary);">Su participación es completamente anónima. No se solicitarán datos personales.</p>
-                <button class="btn btn-green" onclick="iniciarEntrevistaNoExperto()">🚀 Iniciar Entrevista</button>
+                <h2 style="color: #1e3c72;">🔵 No experto</h2>
+                <p style="color: #555;">Su participación es completamente anónima. No se solicitarán datos personales.</p>
+                <button class="btn btn-primary" onclick="iniciarEntrevistaNoExperto()">🚀 Iniciar Entrevista</button>
             </div>
             <button class="btn btn-secondary" onclick="mostrarMenu()">⬅ Volver al inicio</button>
         </div>
 
-        <!-- PORTAL DE ENTREVISTA (Diseño Hexagonal y Funcionalidad Real) -->
+        <!-- PORTAL DE ENTREVISTA (Diseño visual moderno, funcionalidad intacta) -->
         <div id="view-entrevista" class="hidden">
-            <div class="card" style="padding: 20px;">
-                <!-- Cabecera: Texto de instrucciones + Hexágono -->
-                <div class="top-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px;">
-                    <div class="instruction-box" style="background-color: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 15px; flex-grow: 1; font-size: 15px;">
-                        <span id="instruction-text">Por favor escuche el contexto y responda la pregunta 1 de 3.</span>
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px;">
+                    <div style="background: #f8f9fa; border-radius: 12px; padding: 12px; flex-grow: 1; text-align: left;">
+                        <span id="instruction-text" style="color: #333; font-size: 15px;">Por favor escuche el contexto y responda la pregunta 1 de 3.</span>
                     </div>
                     <div class="hex-wrapper">
                         <svg class="hex-icon" viewBox="0 0 100 100">
@@ -181,19 +167,15 @@
                             <line id="side-5" class="hex-side" x1="15" y1="70" x2="15" y2="30" />
                             <line id="side-6" class="hex-side" x1="15" y1="30" x2="50" y2="10" />
                         </svg>
-                        <div class="hex-label" id="hex-label-text">1RA ÍTEM</div>
+                        <div class="hex-label" id="hex-label-text">1RA PREGUNTA</div>
                     </div>
                 </div>
 
-                <!-- Reproductor de Audio Contextual -->
-                <div class="audio-player-box" style="background: #ffffff; border-radius: 8px; padding: 10px 15px; display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                    <audio id="context-audio" controls preload="auto" style="width: 100%;">
-                        Su navegador no soporta elementos de audio.
-                    </audio>
+                <div class="audio-player-box">
+                    <audio id="context-audio" controls style="width: 100%;"></audio>
                 </div>
 
-                <!-- Botones de Interacción de Voz -->
-                <div class="action-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div class="action-buttons">
                     <button class="btn-action btn-record" id="btn-record" onclick="toggleRecording()">
                         <span id="record-icon">🎙️</span> 
                         <span id="record-text">grabar su opinión</span>
@@ -210,509 +192,19 @@
                     </button>
                 </div>
 
-                <!-- Recuadro Editable de Texto -->
-                <textarea class="response-textarea" id="transcription-box" placeholder="Verifique y corrija su respuesta acá si es necesario..."></textarea>
+                <textarea id="transcription-box" placeholder="Verifique y corrija su respuesta acá si es necesario..."></textarea>
 
-                <!-- Navegación Inferior (Triángulos y Confirmación) -->
-                <div class="footer-navigation" style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
-                    <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" title="Anterior (Ítem/Pregunta)" disabled>&#9664;</button>
+                <div class="footer-navigation" style="margin-top: 16px;">
+                    <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
                     <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar envío</button>
-                    <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" title="Siguiente (Ítem/Pregunta)" disabled>&#9654;</button>
+                    <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
                 </div>
 
                 <a href="#" class="home-link" onclick="mostrarMenu()">🏠 Volver al inicio</a>
                 <div id="status-msg" class="status-msg hidden"></div>
             </div>
         </div>
-
-        <!-- PANEL DE INVESTIGADOR -->
-        <div id="view-investigador" class="hidden">
-            <div class="card">
-                <h2 style="color: var(--accent-blue);">🟢 Panel del Investigador</h2>
-                <div class="form-group"><label>Clave de acceso</label><input type="password" id="clave-investigador" placeholder="••••"></div>
-                <button class="btn btn-primary" onclick="accederDashboard()">🔓 Acceder al Dashboard</button>
-                <div id="dashboard-content" class="hidden">
-                    <h3 style="color: var(--text-secondary); margin-top: 16px;">📊 Dashboard de Avances</h3>
-                    <div id="dashboard-stats">Cargando datos...</div>
-                    <button class="btn btn-green" style="margin-top: 12px;" onclick="sincronizarVideos()">🔁 Sincronizar videos pendientes</button>
-                    <div id="sync-status" class="status-msg hidden"></div>
-                </div>
-            </div>
-            <button class="btn btn-secondary" onclick="mostrarMenu()">⬅ Volver al inicio</button>
-        </div>
     </div>
-
-    <!-- CÓDIGO JAVASCRIPT COMPLETO CON LÓGICA REAL -->
-    <script>
-        const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
-
-        let state = {
-            role: null,
-            sessionId: null,
-            lang: 'es-VE',
-            perfil: null,
-            items: [],
-            currentItemIdx: 0,
-            currentSubIdx: 0,
-            answers: {},
-            textoManual: '',
-            transcripcion: '',
-            tieneAudio: false,
-            mediaRecorder: null,
-            audioChunks: [],
-            isRecording: false,
-            isPlaying: false,
-            recognition: null,
-            isRecognizing: false,
-            stream: null
-        };
-
-        document.getElementById('lang-selector').addEventListener('change', (e) => {
-            state.lang = e.target.value;
-        });
-
-        function mostrarMenu() {
-            document.getElementById('view-portada').classList.add('hidden');
-            document.getElementById('view-home').classList.remove('hidden');
-        }
-
-        function showView(viewId) {
-            document.querySelectorAll('.app-container > div[id^="view-"]').forEach(el => el.classList.add('hidden'));
-            document.getElementById(viewId).classList.remove('hidden');
-        }
-
-        function goHome() {
-            mostrarMenu();
-        }
-
-        function selectRole(role) {
-            state.role = role;
-            if (role === 'no_experto') {
-                showView('view-no-experto');
-            } else if (role === 'experto') {
-                cargarPerfiles();
-                showView('view-experto');
-            } else if (role === 'investigador') {
-                showView('view-investigador');
-            }
-        }
-
-        async function cargarPerfiles() {
-            try {
-                const res = await fetch(`${API_BASE}/perfiles`);
-                const data = await res.json();
-                const sel = document.getElementById('perfil-experto');
-                data.forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.id;
-                    opt.textContent = p.nombre;
-                    sel.appendChild(opt);
-                });
-            } catch (e) {
-                console.error('Error cargando perfiles:', e);
-            }
-        }
-
-        document.getElementById('perfil-experto').addEventListener('change', (e) => {
-            if (e.target.value) {
-                document.getElementById('experto-datos').classList.remove('hidden');
-            } else {
-                document.getElementById('experto-datos').classList.add('hidden');
-            }
-        });
-
-        async function iniciarEntrevistaExperto() {
-            const perfil = document.getElementById('perfil-experto').value;
-            const nombre = document.getElementById('nombre').value;
-            const email = document.getElementById('email').value;
-            const cargo = document.getElementById('cargo').value;
-            const institucion = document.getElementById('institucion').value;
-            const grado = document.getElementById('grado').value;
-
-            if (!perfil || !nombre || !email || !cargo) {
-                mostrarStatus('Por favor complete todos los campos requeridos.', 'error');
-                return;
-            }
-
-            state.perfil = perfil;
-            state.lang = document.getElementById('lang-selector').value;
-
-            try {
-                const formData = new FormData();
-                formData.append('role', 'experto');
-                formData.append('perfil', perfil);
-                formData.append('nombre', nombre);
-                formData.append('email', email);
-                formData.append('cargo', cargo);
-                formData.append('institucion', institucion);
-                formData.append('grado', grado);
-                formData.append('lang', state.lang);
-
-                const res = await fetch(`${API_BASE}/sesion`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!res.ok) throw new Error(`Error ${res.status}`);
-                const data = await res.json();
-                state.sessionId = data.sessionId;
-                state.items = data.items;
-                state.currentItemIdx = 0;
-                state.currentSubIdx = 0;
-                showView('view-entrevista');
-                cargarPregunta();
-            } catch (e) {
-                mostrarStatus('Error al iniciar la entrevista.', 'error');
-            }
-        }
-
-        async function iniciarEntrevistaNoExperto() {
-            state.lang = document.getElementById('lang-selector').value;
-            try {
-                const formData = new FormData();
-                formData.append('role', 'no_experto');
-                formData.append('lang', state.lang);
-
-                const res = await fetch(`${API_BASE}/sesion`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!res.ok) throw new Error(`Error ${res.status}`);
-                const data = await res.json();
-                state.sessionId = data.sessionId;
-                state.items = data.items;
-                state.currentItemIdx = 0;
-                state.currentSubIdx = 0;
-                showView('view-entrevista');
-                cargarPregunta();
-            } catch (e) {
-                mostrarStatus('Error al iniciar la entrevista.', 'error');
-            }
-        }
-
-        async function cargarPregunta() {
-            const itemIdx = state.currentItemIdx;
-            const subIdx = state.currentSubIdx;
-            const itemNum = state.items[itemIdx];
-            const globalIdx = (itemIdx * 3) + subIdx + 1;
-
-            state.textoManual = '';
-            state.transcripcion = '';
-            state.tieneAudio = false;
-            state.isRecognizing = false;
-            state.isRecording = false;
-
-            document.getElementById('btn-record').disabled = true;
-            document.getElementById('btn-play-response').disabled = true;
-            document.getElementById('btn-confirmar').disabled = true;
-            document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
-            document.getElementById('btn-siguiente').disabled = false;
-
-            const ca = document.getElementById('context-audio'); ca.pause(); ca.removeAttribute('src'); ca.load();
-            const tb = document.getElementById('transcription-box');
-            tb.value = '';
-            tb.placeholder = 'Verifique y corrija su respuesta acá si es necesario...';
-
-            // Lógica para expertos: reproducir el preámbulo (Ítem)
-            if (state.role === 'experto' && subIdx === 0) {
-                try {
-                    const res = await fetch(`${API_BASE}/item/${itemNum}?lang=${state.lang}`);
-                    const data = await res.json();
-                    document.getElementById('instruction-text').innerHTML = `
-                        <strong>Ítem ${itemNum}:</strong> ${data.titulo}.<br>
-                        Escuche el contexto y luego responda las preguntas.
-                    `;
-                } catch (e) {
-                    document.getElementById('instruction-text').textContent = `Ítem ${itemNum}: Cargando...`;
-                }
-                // Reproducir el audio del ítem (previo)
-                const itemAudio = `${API_BASE}/audio/item/${itemNum}`;
-                document.getElementById('context-audio').src = itemAudio;
-                document.getElementById('context-audio').load();
-                const player = document.getElementById('context-audio');
-                player.onended = () => {
-                    cargarPreguntaReal(itemNum, subIdx, globalIdx);
-                };
-                player.onerror = () => {
-                    if (!player.getAttribute('src')) return;
-                    console.error('No se pudo cargar el audio del ítem:', player.src);
-                    mostrarStatus('No se pudo cargar el audio de contexto. Continuando con la pregunta...', 'error');
-                    cargarPreguntaReal(itemNum, subIdx, globalIdx);
-                };
-                return;
-            }
-
-            // Si no es experto o no es inicio, cargar pregunta directamente
-            cargarPreguntaReal(itemNum, subIdx, globalIdx);
-        }
-
-        async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
-            const audioUrl = `${API_BASE}/audio/pregunta/${globalIdx}`;
-            document.getElementById('context-audio').src = audioUrl;
-            document.getElementById('context-audio').load();
-
-            try {
-                const res = await fetch(`${API_BASE}/pregunta/${globalIdx}?lang=${state.lang}`);
-                const data = await res.json();
-                document.getElementById('instruction-text').innerHTML = data.texto;
-            } catch (e) {
-                document.getElementById('instruction-text').textContent = 'Error al cargar la pregunta.';
-            }
-
-            const player = document.getElementById('context-audio');
-            player.onended = () => {
-                state.isPlaying = false;
-                document.getElementById('btn-record').disabled = false;
-                document.getElementById('btn-play-response').disabled = false;
-                document.getElementById('btn-confirmar').disabled = false;
-                mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
-            };
-            player.onerror = () => {
-                if (!player.getAttribute('src')) return;
-                console.error('No se pudo cargar el audio de la pregunta:', player.src);
-                document.getElementById('btn-record').disabled = false;
-                document.getElementById('btn-play-response').disabled = false;
-                document.getElementById('btn-confirmar').disabled = false;
-                mostrarStatus('No se pudo cargar el audio. Puede leer la pregunta y responder igualmente.', 'error');
-            };
-
-            actualizarHexagono();
-            mostrarStatus('', '');
-        }
-
-        function actualizarHexagono() {
-            const hexLabel = document.getElementById('hex-label-text');
-            const itemNum = state.currentItemIdx + 1;
-            const subNum = state.currentSubIdx + 1;
-            const sufijos = ['RA', 'DA', 'RA'];
-            hexLabel.textContent = `${subNum}${sufijos[subNum-1]} PREGUNTA`;
-            for (let i = 1; i <= 6; i++) {
-                const side = document.getElementById(`side-${i}`);
-                side.classList.toggle('active', i === itemNum);
-            }
-        }
-
-        async function toggleRecording() {
-            if (state.isRecording) {
-                stopRecording();
-                return;
-            }
-            await startRecording();
-        }
-
-        async function startRecording() {
-            try {
-                const constraints = { audio: true };
-                state.stream = await navigator.mediaDevices.getUserMedia(constraints);
-                state.mediaRecorder = new MediaRecorder(state.stream);
-                state.audioChunks = [];
-
-                state.mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) state.audioChunks.push(e.data);
-                };
-
-                state.mediaRecorder.onstop = () => {
-                    const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-                    state.tieneAudio = true;
-                    document.getElementById('btn-play-response').disabled = false;
-                    document.getElementById('vu-meter').classList.remove('active');
-                };
-
-                state.mediaRecorder.start();
-                state.isRecording = true;
-                document.getElementById('btn-record').classList.add('recording');
-                document.getElementById('record-text').innerText = "grabando...";
-                document.getElementById('vu-meter').classList.add('active');
-                mostrarStatus('Grabando...', 'success');
-            } catch (e) {
-                if (e.name === 'NotAllowedError') {
-                    mostrarStatus('Permiso de micrófono denegado.', 'error');
-                } else {
-                    mostrarStatus('Error al iniciar la grabación.', 'error');
-                }
-            }
-        }
-
-        function stopRecording() {
-            if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
-                state.mediaRecorder.stop();
-            }
-            state.isRecording = false;
-            document.getElementById('btn-record').classList.remove('recording');
-            document.getElementById('record-text').innerText = "grabar su opinión";
-            mostrarStatus('Grabación finalizada.', 'success');
-            if (state.stream) {
-                state.stream.getTracks().forEach(track => track.stop());
-                state.stream = null;
-            }
-        }
-
-        function playResponse() {
-            if (state.audioChunks.length === 0) {
-                mostrarStatus('No hay respuesta grabada para reproducir.', 'error');
-                return;
-            }
-            const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-            const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
-            audio.play();
-        }
-
-        async function confirmarEnvio() {
-            if (state.isRecording) {
-                mostrarStatus('Por favor detenga la grabación antes de confirmar.', 'error');
-                return;
-            }
-            const respuesta = document.getElementById('transcription-box').value.trim();
-            if (!respuesta && !state.tieneAudio) {
-                mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
-                return;
-            }
-            const guardado = await guardarRespuesta(respuesta);
-            if (!guardado) {
-                mostrarStatus('No se pudo guardar la respuesta.', 'error');
-                return;
-            }
-            const itemIdx = state.currentItemIdx;
-            const subIdx = state.currentSubIdx;
-            if (subIdx < 2) {
-                state.currentSubIdx++;
-            } else if (itemIdx < state.items.length - 1) {
-                state.currentItemIdx++;
-                state.currentSubIdx = 0;
-            } else {
-                mostrarStatus('🎉 Entrevista completada. ¡Gracias por participar!', 'success');
-                document.getElementById('btn-confirmar').disabled = true;
-                document.getElementById('btn-siguiente').disabled = true;
-                return;
-            }
-            cargarPregunta();
-            mostrarStatus('', '');
-        }
-
-        async function navegar(direccion) {
-            if (state.isRecording) {
-                mostrarStatus('Por favor detenga la grabación antes de avanzar.', 'error');
-                return;
-            }
-            const itemIdx = state.currentItemIdx;
-            const subIdx = state.currentSubIdx;
-            if (direccion === 1) {
-                if (subIdx < 2) {
-                    state.currentSubIdx++;
-                    cargarPregunta();
-                } else if (itemIdx < state.items.length - 1) {
-                    state.currentItemIdx++;
-                    state.currentSubIdx = 0;
-                    cargarPregunta();
-                } else {
-                    mostrarStatus('Ya está en la última pregunta.', 'info');
-                }
-            } else if (direccion === -1) {
-                if (subIdx > 0) {
-                    state.currentSubIdx--;
-                    cargarPregunta();
-                } else if (itemIdx > 0) {
-                    state.currentItemIdx--;
-                    state.currentSubIdx = 2;
-                    cargarPregunta();
-                } else {
-                    mostrarStatus('Ya está en la primera pregunta.', 'info');
-                }
-            }
-            mostrarStatus('', '');
-        }
-
-        async function guardarRespuesta(respuesta) {
-            const formData = new FormData();
-            formData.append('sessionId', state.sessionId);
-            formData.append('itemIdx', state.currentItemIdx);
-            formData.append('subIdx', state.currentSubIdx);
-            formData.append('transcripcion', respuesta);
-            formData.append('perfil', state.role);
-            formData.append('lang', state.lang);
-            if (state.audioChunks.length > 0) {
-                const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-                formData.append('audio', blob, 'respuesta.webm');
-            }
-            try {
-                const res = await fetch(`${API_BASE}/respuesta`, { method: 'POST', body: formData });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                state.audioChunks = [];
-                return true;
-            } catch (e) {
-                console.error('Error al guardar la respuesta:', e);
-                return false;
-            }
-        }
-
-        function mostrarStatus(msg, type) {
-            const el = document.getElementById('status-msg');
-            if (!msg) { el.classList.add('hidden'); return; }
-            el.textContent = msg;
-            el.className = 'status-msg ' + (type || '');
-            el.classList.remove('hidden');
-        }
-
-        async function accederDashboard() {
-            const clave = document.getElementById('clave-investigador').value;
-            if (clave !== '5656') {
-                mostrarStatus('Clave incorrecta.', 'error');
-                return;
-            }
-            document.getElementById('dashboard-content').classList.remove('hidden');
-            await cargarDashboard();
-        }
-
-        async function cargarDashboard() {
-            try {
-                const res = await fetch(`${API_BASE}/admin/dashboard`);
-                const data = await res.json();
-                document.getElementById('dashboard-stats').innerHTML = `
-                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                        <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
-                            <h4 style="color: #90e0ef; margin: 0;">📝 Respuestas</h4>
-                            <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.totalRespuestas}</p>
-                        </div>
-                        <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
-                            <h4 style="color: #90e0ef; margin: 0;">👤 Sesiones</h4>
-                            <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.totalSesiones}</p>
-                        </div>
-                        <div style="background: #1c2541; padding: 16px; border-radius: 8px; flex: 1; min-width: 120px;">
-                            <h4 style="color: #90e0ef; margin: 0;">🎥 Videos pendientes</h4>
-                            <p style="font-size: 2rem; margin: 4px 0; color: #fff;">${data.videosPendientes}</p>
-                        </div>
-                    </div>
-                `;
-            } catch (e) {
-                document.getElementById('dashboard-stats').textContent = 'Error cargando datos.';
-            }
-        }
-
-        async function sincronizarVideos() {
-            const btn = document.querySelector('button[onclick="sincronizarVideos()"]');
-            btn.disabled = true;
-            btn.textContent = '⏳ Sincronizando...';
-            try {
-                const res = await fetch(`${API_BASE}/admin/sincronizar_videos`, { method: 'POST' });
-                const data = await res.json();
-                document.getElementById('sync-status').textContent = data.mensaje;
-                document.getElementById('sync-status').className = 'status-msg success';
-                document.getElementById('sync-status').classList.remove('hidden');
-                await cargarDashboard();
-            } catch (e) {
-                document.getElementById('sync-status').textContent = 'Error al sincronizar.';
-                document.getElementById('sync-status').className = 'status-msg error';
-                document.getElementById('sync-status').classList.remove('hidden');
-            }
-            btn.disabled = false;
-            btn.textContent = '🔁 Sincronizar videos pendientes';
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('view-portada').classList.remove('hidden');
-        });
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
