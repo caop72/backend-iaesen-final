@@ -33,7 +33,11 @@ function mostrarMenu() {
 }
 
 function showView(viewId) {
-    document.querySelectorAll('.app-container > div[id^="view-"]').forEach(el => el.classList.add('hidden'));
+    // Ocultar TODAS las vistas primero (forzado)
+    document.querySelectorAll('.app-container > div[id^="view-"]').forEach(el => {
+        el.classList.add('hidden');
+    });
+    // Mostrar solo la vista deseada
     document.getElementById(viewId).classList.remove('hidden');
 }
 
