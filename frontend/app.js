@@ -47,17 +47,18 @@ function selectRole(role) {
 
 async function cargarPerfiles() {
     try {
-    const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
-    const data = await res.json();
-    const totalPreguntas = state.items.length * 3;
-    document.getElementById('instruction-text').innerHTML = data.texto.replace(
-        /Pregunta número \d+/,
-        `Pregunta Número ${globalIdx} de ${totalPreguntas}`
-    );
-} catch (e) {
-    document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${state.items.length * 3}`;
-}
-
+        const res = await fetch(`${API_BASE}/perfiles`);
+        const data = await res.json();
+        const sel = document.getElementById('perfil-experto');
+        data.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.nombre;
+            sel.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Error cargando perfiles:', e);
+    }
 }
 
 document.getElementById('perfil-experto').addEventListener('change', (e) => {
@@ -140,6 +141,10 @@ async function cargarPregunta() {
     const itemNum = state.items[itemIdx];
     const globalIdx = (itemIdx * 3) + subIdx + 1;
 
+    // 🔁 VERIFICAR SI YA HAY UNA RESPUESTA GUARDADA PARA ESTA PREGUNTA
+    const key = `${itemIdx}_${subIdx}`;
+    const respuestaGuardada = state.answers[key] || '';
+
     state.textoManual = '';
     state.transcripcion = '';
     state.tieneAudio = false;
@@ -154,8 +159,10 @@ async function cargarPregunta() {
 
     const ca = document.getElementById('context-audio'); ca.pause(); ca.removeAttribute('src'); ca.load();
     const tb = document.getElementById('transcription-box');
-    tb.value = '';
-    tb.placeholder = 'Verifique y corrija su respuesta acá si es necesario...';
+
+    // ✅ MOSTRAR LA RESPUESTA GUARDADA SI EXISTE
+    tb.value = respuestaGuardada;
+    tb.placeholder = respuestaGuardada ? '' : 'Verifique y corrija su respuesta acá si es necesario...';
 
     if (state.role === 'experto' && subIdx === 0) {
         try {
