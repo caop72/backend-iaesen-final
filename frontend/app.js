@@ -208,18 +208,19 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
     document.getElementById('context-audio').src = audioUrl;
     document.getElementById('context-audio').load();
 
-    try {
-        const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
-        const data = await res.json();
-        const totalPreguntas = state.items.length * 3;
-        document.getElementById('instruction-text').innerHTML = data.texto.replace(
-            /Pregunta número \d+/,
-            `Pregunta Número ${globalIdx} de ${totalPreguntas}`
-        );
-    } catch (e) {
-        const totalPreguntas = state.items.length * 3;
-        document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
-    }
+try {
+    const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
+    const data = await res.json();
+    const totalPreguntas = state.items.length * 3;
+    // Reemplazar cualquier texto que contenga "Pregunta número" por el formato correcto
+    document.getElementById('instruction-text').innerHTML = data.texto.replace(
+        /Pregunta número \d+(.*)?/,
+        `Pregunta Número ${globalIdx} de ${totalPreguntas}`
+    );
+} catch (e) {
+    const totalPreguntas = state.items.length * 3;
+    document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
+}
 
     const player = document.getElementById('context-audio');
     player.onended = () => {
