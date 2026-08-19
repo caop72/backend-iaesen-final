@@ -1,4 +1,4 @@
-// app.js - Versión con fusión de audios e indicador visual
+// app.js - Versión final con todas las correcciones del análisis
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -10,7 +10,7 @@ let state = {
     currentSubIdx: 0,
     answers: {},
     textoManual: '',
-    transcripcion: '',
+    transcripcionFinal: '',
     tieneAudio: false,
     mediaRecorder: null,
     audioChunks: [],
@@ -23,8 +23,7 @@ let state = {
     mouseStarted: false,
     recordingStartTime: 0,
     recordingTimer: null,
-    itemPlayed: false,
-    questionPlayed: false
+    audioEscuchadoEnPreguntaActual: false
 };
 
 function mostrarMenu() {
@@ -141,27 +140,52 @@ async function iniciarEntrevistaNoExperto() {
     }
 }
 
-function updateStatusIndicator() {
+function actualizarEstadoIndicador() {
     const indicator = document.getElementById('status-indicator');
+    const instruction = document.getElementById('instruction-text');
+
     if (!indicator) return;
-    
-    if (state.isRecording) {
-        indicator.className = 'status-indicator recording';
-        indicator.style.background = 'var(--danger)';
-        indicator.style.borderColor = 'var(--danger)';
-    } else if (state.itemPlayed && state.questionPlayed) {
-        indicator.className = 'status-indicator ready';
-        indicator.style.background = 'var(--success-light)';
-        indicator.style.borderColor = 'var(--success)';
-    } else if (state.itemPlayed) {
-        indicator.className = 'status-indicator listening';
-        indicator.style.background = 'var(--accent-light)';
-        indicator.style.borderColor = 'var(--accent)';
-    } else {
+
+    if (!state.audioEscuchadoEnPreguntaActual) {
         indicator.className = 'status-indicator locked';
-        indicator.style.background = 'var(--danger-light)';
-        indicator.style.borderColor = 'var(--danger)';
+        instruction.textContent = '🔴 Por favor escuche el audio antes de responder.';
+        document.getElementById('btn-record').disabled = true;
+        document.getElementById('btn-confirmar').disabled = true;
+        return;
     }
+
+    indicator.className = 'status-indicator ready';
+    instruction.textContent = '🟢 Ahora puede grabar su respuesta.';
+    document.getElementById('btn-record').disabled = false;
+    document.getElementById('btn-confirmar').disabled = false;
+}
+
+function cargarPrimeraPreguntaDeItem(itemIdx) {
+    const pIndex = itemIdx * 3;
+    const audio = document.getElementById('context-audio');
+    const itemNum = state.items[itemIdx];
+
+    state.audioEscuchadoEnPreguntaActual = false;
+    actualizarEstadoIndicador();
+
+    // 1. Reproducir el audio del ítem (previo)
+    const previoSrc = `${API_BASE}/audio/item/${itemNum}`;
+    audio.src = previoSrc;
+    audio.load();
+    audio.play().catch(() => {});
+
+    audio.onended = () => {
+        // 2. Al terminar el previo, cargar automáticamente la primera pregunta
+        const preguntaSrc = `${API_BASE}/audio/pregunta/${pIndex + 1}`;
+        audio.src = preguntaSrc;
+        audio.load();
+        audio.play().catch(() => {});
+
+        audio.onended = () => {
+            state.audioEscuchadoEnPreguntaActual = true;
+            actualizarEstadoIndicador();
+        };
+    };
 }
 
 async function cargarPregunta() {
@@ -174,12 +198,11 @@ async function cargarPregunta() {
     const respuestaGuardada = state.answers[key] || '';
 
     state.textoManual = '';
-    state.transcripcion = '';
+    state.transcripcionFinal = '';
     state.tieneAudio = false;
     state.isRecognizing = false;
     state.isRecording = false;
-    state.itemPlayed = false;
-    state.questionPlayed = false;
+    state.audioEscuchadoEnPreguntaActual = false;
 
     document.getElementById('btn-record').disabled = true;
     document.getElementById('btn-play-response').disabled = true;
@@ -196,17 +219,12 @@ async function cargarPregunta() {
     tb.value = respuestaGuardada;
     tb.placeholder = respuestaGuardada ? '' : 'Verifique y corrija su respuesta acá si es necesario...';
 
-    // Actualizar contador y barra de progreso
     const totalPreguntas = state.items.length * 3;
     document.getElementById('question-counter').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
     const pct = ((globalIdx) / totalPreguntas) * 100;
     document.getElementById('progress-fill').style.width = pct + '%';
 
-    // Actualizar indicador visual
-    updateStatusIndicator();
-
     if (state.role === 'experto' && subIdx === 0) {
-        // Cargar el audio del ítem (previo) primero
         try {
             const res = await fetch(`${API_BASE}/item/${itemNum}`);
             const data = await res.json();
@@ -217,22 +235,8 @@ async function cargarPregunta() {
         } catch (e) {
             document.getElementById('instruction-text').textContent = `Ítem ${itemNum}: Cargando...`;
         }
-        const itemAudio = `${API_BASE}/audio/item/${itemNum}`;
-        document.getElementById('context-audio').src = itemAudio;
-        document.getElementById('context-audio').load();
-        const player = document.getElementById('context-audio');
-        player.onended = () => {
-            state.itemPlayed = true;
-            updateStatusIndicator();
-            // Cuando el ítem termina, cargar la primera pregunta automáticamente
-            cargarPreguntaReal(itemNum, subIdx, globalIdx);
-        };
-        player.onerror = () => {
-            if (!player.getAttribute('src')) return;
-            console.error('No se pudo cargar el audio del ítem:', player.src);
-            mostrarStatus('No se pudo cargar el audio de contexto. Continuando con la pregunta...', 'error');
-            cargarPreguntaReal(itemNum, subIdx, globalIdx);
-        };
+        // Usar la nueva función de fusión de audios
+        cargarPrimeraPreguntaDeItem(itemIdx);
         return;
     }
 
@@ -259,8 +263,8 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
 
     const player = document.getElementById('context-audio');
     player.onended = () => {
-        state.questionPlayed = true;
-        updateStatusIndicator();
+        state.audioEscuchadoEnPreguntaActual = true;
+        actualizarEstadoIndicador();
         state.isPlaying = false;
         document.getElementById('btn-record').disabled = false;
         document.getElementById('btn-play-response').disabled = false;
@@ -362,7 +366,6 @@ async function startRecording() {
         mostrarStatus('Grabando...', 'success');
 
         iniciarReconocimiento();
-        updateStatusIndicator();
 
         if (state.recordingTimer) clearInterval(state.recordingTimer);
         state.recordingTimer = setInterval(() => {
@@ -382,7 +385,6 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
-            updateStatusIndicator();
         };
     } catch (e) {
         if (e.name === 'NotAllowedError') {
@@ -402,7 +404,6 @@ function stopRecording() {
     document.getElementById('record-text').innerText = "grabar su opinión";
     mostrarStatus('Grabación finalizada.', 'success');
     document.getElementById('vu-meter').classList.remove('active');
-    updateStatusIndicator();
 
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
@@ -440,31 +441,28 @@ function iniciarReconocimiento() {
     };
 
     state.recognition.onresult = (event) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
+        let interim = '';
+        let finalText = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        // Recorrer TODOS los resultados, no solo desde resultIndex
+        for (let i = 0; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalTranscript += transcript + ' ';
+                finalText += transcript + ' ';
             } else {
-                interimTranscript += transcript;
+                interim += transcript;
             }
         }
 
-        if (finalTranscript) {
-            state.transcripcion = finalTranscript.trim();
+        if (finalText.trim()) {
+            state.transcripcionFinal += finalText;
         }
 
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
 
-        const textoActual = state.transcripcion || '';
-        const textoCompleto = interimTranscript 
-            ? `${textoActual} ${interimTranscript}`.trim() 
-            : textoActual;
-
-        tb.value = textoCompleto;
+        const mostrar = (state.transcripcionFinal || '') + (interim ? ' ' + interim : '');
+        tb.value = mostrar.trim();
         tb.scrollTop = tb.scrollHeight;
     };
 
@@ -483,6 +481,11 @@ function iniciarReconocimiento() {
     state.recognition.onend = () => {
         state.isRecognizing = false;
         console.log('Reconocimiento finalizado');
+        // Limpiar el texto provisional y dejar solo el final
+        const tb = document.getElementById('transcription-box');
+        if (tb) {
+            tb.value = (state.transcripcionFinal || '').trim();
+        }
     };
 
     state.recognition.start();
@@ -502,13 +505,12 @@ function playResponse() {
 function borrarRespuesta() {
     const tb = document.getElementById('transcription-box');
     tb.value = '';
-    state.transcripcion = '';
+    state.transcripcionFinal = '';
     state.tieneAudio = false;
     state.audioChunks = [];
     document.getElementById('btn-play-response').disabled = true;
     document.getElementById('btn-confirmar').disabled = true;
     mostrarStatus('Respuesta borrada.', 'info');
-    updateStatusIndicator();
 }
 
 async function confirmarEnvio() {

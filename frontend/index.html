@@ -93,7 +93,13 @@
         .status-msg.success { background: var(--success-light); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); }
         .status-msg.error { background: var(--danger-light); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent); }
         .status-msg.info { background: var(--accent-light); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); }
-        .footer-navigation { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; }
+        .footer-navigation {
+            display: grid;
+            grid-template-columns: auto 1fr 1fr auto;
+            gap: 8px;
+            align-items: center;
+            margin-top: 16px;
+        }
         .nav-arrow { background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer; padding: 0 8px; transition: transform 0.1s; }
         .nav-arrow:hover { transform: scale(1.1); }
         .nav-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -102,6 +108,7 @@
         .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
         .btn-clear { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .btn-clear:hover { background: var(--danger-light); }
+        .btn-clear:disabled { opacity: 0.35; cursor: not-allowed; }
         .home-link { display: block; text-align: center; margin-top: 12px; color: var(--text-tertiary); font-size: 13px; text-decoration: none; }
         .home-link:hover { color: var(--text-secondary); }
         .status-indicator { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-strong); transition: all 0.3s ease; flex-shrink: 0; margin-left: 8px; }
@@ -190,10 +197,10 @@
             <button class="btn btn-secondary" onclick="mostrarMenu()">⬅ Volver al inicio</button>
         </div>
 
-        <!-- PORTAL DE ENTREVISTA (Diseño optimizado con indicador visual) -->
+        <!-- PORTAL DE ENTREVISTA -->
         <div id="view-entrevista" class="hidden">
             <div class="card">
-                <!-- 1. CABECERA: Pregunta + Indicador de estado -->
+                <!-- CABECERA: Pregunta + Indicador de estado -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px;">
                     <div style="flex-grow: 1;">
                         <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
@@ -217,12 +224,12 @@
                     </div>
                 </div>
 
-                <!-- 2. AUDIO -->
+                <!-- AUDIO -->
                 <div class="audio-player-box" style="margin-bottom: 12px;">
                     <audio id="context-audio" controls style="width: 100%;"></audio>
                 </div>
 
-                <!-- 3. CUADRO DE TEXTO -->
+                <!-- CUADRO DE TEXTO -->
                 <div style="margin-bottom: 12px;">
                     <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">Verifique su respuesta antes de confirmar su envío:</div>
                     <textarea id="transcription-box" 
@@ -231,7 +238,7 @@
                     </textarea>
                 </div>
 
-                <!-- 4. BOTONES DE ACCIÓN -->
+                <!-- BOTONES DE ACCIÓN -->
                 <div class="action-buttons" style="margin-bottom: 12px;">
                     <button class="btn-action btn-record" id="btn-record" style="flex: 2;">
                         <span id="record-icon">🎙️</span> 
@@ -245,11 +252,11 @@
                         </div>
                     </button>
                     <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" disabled>
-                        ▶️ Escuchar su respuesta
+                        ▶️ Reproducir mi respuesta
                     </button>
                 </div>
 
-                <!-- 5. BARRA DE NAVEGACIÓN INFERIOR -->
+                <!-- BARRA DE NAVEGACIÓN INFERIOR -->
                 <div class="footer-navigation">
                     <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
                     <button class="btn-clear" id="btn-clear" onclick="borrarRespuesta()">🗑️ Borrar</button>
