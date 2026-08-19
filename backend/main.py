@@ -251,8 +251,8 @@ async def dashboard():
         "videosPendientes": videos_pendientes
     })
 
-@app.post("/api/admin/sincronizar_videos")
-async def sincronizar_videos():
+@app.post("/api/admin/sincronizar")
+async def sincronizar():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''SELECT id FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' LIMIT 100''')
