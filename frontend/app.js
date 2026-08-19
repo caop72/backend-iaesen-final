@@ -1,4 +1,4 @@
-// app.js - Versión corregida (pantalla continua, texto dinámico y respuestas guardadas)
+// app.js - Versión final con eventos táctiles y de mouse separados
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -245,15 +245,45 @@ function actualizarHexagono() {
     }
 }
 
-function iniciarGrabacion() {
-    if (state.isRecording) return;
-    startRecording();
-}
+// ------------------------------------------------------------------
+// GRABACIÓN ESTILO "MANTENER PRESIONADO" (Eventos separados)
+// ------------------------------------------------------------------
+let isPressing = false;
 
-function detenerGrabacion() {
-    if (!state.isRecording) return;
+// Soporte para celular (táctil)
+document.getElementById('btn-record').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (isPressing) return;
+    isPressing = true;
+    startRecording();
+});
+
+document.getElementById('btn-record').addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!isPressing) return;
+    isPressing = false;
     stopRecording();
-}
+});
+
+// Soporte para PC (mouse)
+document.getElementById('btn-record').addEventListener('mousedown', (e) => {
+    if (isPressing) return;
+    isPressing = true;
+    startRecording();
+});
+
+document.getElementById('btn-record').addEventListener('mouseup', (e) => {
+    if (!isPressing) return;
+    isPressing = false;
+    stopRecording();
+});
+
+document.getElementById('btn-record').addEventListener('mouseleave', (e) => {
+    if (isPressing) {
+        isPressing = false;
+        stopRecording();
+    }
+});
 
 async function startRecording() {
     try {
@@ -297,9 +327,7 @@ function stopRecording() {
     document.getElementById('btn-record').classList.remove('recording');
     document.getElementById('record-text').innerText = "grabar su opinión";
     mostrarStatus('Grabación finalizada.', 'success');
-
-    const tb = document.getElementById('transcription-box');
-    tb.placeholder = "✅ Grabación finalizada. Puede corregir, complementar o borrar y volver a grabar.";
+    document.getElementById('vu-meter').classList.remove('active');
 
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
