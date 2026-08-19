@@ -81,30 +81,49 @@ def obtener_servicio_sheets():
 def sincronizar_respuesta(respuesta_id: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''SELECT sesion_id, item_idx, sub_idx, transcripcion, audio_path, video_path 
-                 FROM respuestas WHERE id = ?''', (respuesta_id,))
+    c.execute('''SELECT s.nombre, s.email, s.grado, s.cargo, s.institucion, s.perfil, s.codigo, s.ambito, 
+                        r.item_idx, r.sub_idx, r.transcripcion, r.created_at
+                 FROM respuestas r
+                 JOIN sesiones s ON r.sesion_id = s.id
+                 WHERE r.id = ?''', (respuesta_id,))
     row = c.fetchone()
     conn.close()
     if not row:
         return
-    sesion_id, item_idx, sub_idx, transcripcion, audio_path, video_path = row
+    
+    nombre, email, grado, cargo, institucion, perfil, codigo, ambito, item_idx, sub_idx, transcripcion, created_at = row
+    
     try:
         service = obtener_servicio_sheets()
         sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
         sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheet_name = sheet_metadata['sheets'][0]['properties']['title']
+        
+        # SE ENVÍAN LAS 13 COLUMNAS EN EL ORDEN CORRECTO
         valores = [[
-            sesion_id, item_idx + 1, sub_idx + 1, transcripcion,
-            audio_path or "", video_path or "",
-            datetime.datetime.now().isoformat()
+            nombre or "",
+            email or "",
+            grado or "",
+            cargo or "",
+            institucion or "",
+            perfil or "",
+            codigo or "",
+            ambito or "",
+            "Técnica-Cibernética",  # Dimensión fija por ahora
+            item_idx + 1,
+            f"Pregunta {item_idx + 1}",
+            transcripcion or "",
+            created_at.isoformat() if created_at else datetime.datetime.now().isoformat()
         ]]
+        
         service.spreadsheets().values().append(
             spreadsheetId=sheet_id,
-            range=f"{sheet_name}!A:G",
+            range=f"{sheet_name}!A:M",
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body={"values": valores}
         ).execute()
+        
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''UPDATE respuestas SET sync_status = 'synced', synced_at = ? WHERE id = ?''',
@@ -118,6 +137,7 @@ def sincronizar_respuesta(respuesta_id: int):
                   (str(e), respuesta_id))
         conn.commit()
         conn.close()
+        raise e
 
 @app.post("/api/sesion")
 async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None), 
