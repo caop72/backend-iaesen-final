@@ -233,12 +233,17 @@ function actualizarHexagono() {
     }
 }
 
-async function toggleRecording() {
-    if (state.isRecording) {
-        stopRecording();
-        return;
-    }
-    await startRecording();
+// ------------------------------------------------------------------
+// GRABACIÓN ESTILO "MANTENER PRESIONADO"
+// ------------------------------------------------------------------
+function iniciarGrabacion() {
+    if (state.isRecording) return;
+    startRecording();
+}
+
+function detenerGrabacion() {
+    if (!state.isRecording) return;
+    stopRecording();
 }
 
 async function startRecording() {

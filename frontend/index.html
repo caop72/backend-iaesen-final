@@ -176,17 +176,19 @@
                 </div>
 
                 <div class="action-buttons">
-                    <button class="btn-action btn-record" id="btn-record" onclick="toggleRecording()">
-                        <span id="record-icon">🎙️</span> 
-                        <span id="record-text">grabar su opinión</span>
-                        <div class="vu-meter" id="vu-meter">
-                            <div class="vu-bar" style="height: 6px;"></div>
-                            <div class="vu-bar" style="height: 14px;"></div>
-                            <div class="vu-bar" style="height: 10px;"></div>
-                            <div class="vu-bar" style="height: 18px;"></div>
-                            <div class="vu-bar" style="height: 8px;"></div>
-                        </div>
-                    </button>
+<button class="btn-action btn-record" id="btn-record" 
+        onmousedown="iniciarGrabacion()" onmouseup="detenerGrabacion()"
+        ontouchstart="iniciarGrabacion()" ontouchend="detenerGrabacion()">
+    <span id="record-icon">🎙️</span> 
+    <span id="record-text">grabar su opinión</span>
+    <div class="vu-meter" id="vu-meter">
+        <div class="vu-bar" style="height: 6px;"></div>
+        <div class="vu-bar" style="height: 14px;"></div>
+        <div class="vu-bar" style="height: 10px;"></div>
+        <div class="vu-bar" style="height: 18px;"></div>
+        <div class="vu-bar" style="height: 8px;"></div>
+    </div>
+</button>
                     <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" disabled>
                         ▶️ Escuchar su respuesta
                     </button>
