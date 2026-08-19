@@ -226,28 +226,36 @@ async def guardar_respuesta(
     sessionId: str = Form(...),
     itemIdx: int = Form(...),
     subIdx: int = Form(...),
-    transcripcion: str = Form(...),
+    transcripcion: str = Form(default=""),
     perfil: str = Form(...),
-    lang: str = Form("es-VE"),
     audio: Optional[UploadFile] = File(None)
 ):
+    # Si no hay texto y no hay audio, rechazar
     if not transcripcion.strip() and audio is None:
-        raise HTTPException(422, "Respuesta vacía")
+        raise HTTPException(422, "Debe proporcionar transcripción o audio")
+    
+    # Si no hay transcripción, usar un placeholder para que el backend no falle
+    if not transcripcion.strip():
+        transcripcion = "[Respuesta de voz]"
+    
     audio_path = None
     if audio:
         audio_path = f"/data/audios_respuestas/{sessionId}_{itemIdx}_{subIdx}_audio.webm"
         async with aiofiles.open(audio_path, 'wb') as f:
             await f.write(await audio.read())
+
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO respuestas 
                  (sesion_id, item_idx, sub_idx, audio_path, transcripcion, lang, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?)''',
-              (sessionId, itemIdx, subIdx, audio_path, transcripcion, lang, datetime.datetime.now()))
+              (sessionId, itemIdx, subIdx, audio_path, transcripcion, "es-VE", datetime.datetime.now()))
     respuesta_id = c.lastrowid
     conn.commit()
     conn.close()
+
     background_tasks.add_task(sincronizar_respuesta, respuesta_id)
+    
     return JSONResponse({
         "status": "saved",
         "respuesta_id": respuesta_id,
