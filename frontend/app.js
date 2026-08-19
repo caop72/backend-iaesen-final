@@ -1,4 +1,4 @@
-// app.js - Lógica original intacta, adaptada al nuevo diseño visual
+// app.js - Versión corregida (pantalla continua, texto dinámico y respuestas guardadas)
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -202,9 +202,14 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
     try {
         const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
         const data = await res.json();
-        document.getElementById('instruction-text').innerHTML = data.texto;
+        const totalPreguntas = state.items.length * 3;
+        document.getElementById('instruction-text').innerHTML = data.texto.replace(
+            /Pregunta número \d+/,
+            `Pregunta Número ${globalIdx} de ${totalPreguntas}`
+        );
     } catch (e) {
-        document.getElementById('instruction-text').textContent = 'Error al cargar la pregunta.';
+        const totalPreguntas = state.items.length * 3;
+        document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
     }
 
     const player = document.getElementById('context-audio');
@@ -240,9 +245,6 @@ function actualizarHexagono() {
     }
 }
 
-// ------------------------------------------------------------------
-// GRABACIÓN ESTILO "MANTENER PRESIONADO"
-// ------------------------------------------------------------------
 function iniciarGrabacion() {
     if (state.isRecording) return;
     startRecording();
@@ -296,10 +298,8 @@ function stopRecording() {
     document.getElementById('record-text').innerText = "grabar su opinión";
     mostrarStatus('Grabación finalizada.', 'success');
 
-    // --- AGREGAR ESTAS DOS LÍNEAS ---
     const tb = document.getElementById('transcription-box');
     tb.placeholder = "✅ Grabación finalizada. Puede corregir, complementar o borrar y volver a grabar.";
-    // ---------------------------------
 
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
@@ -307,9 +307,6 @@ function stopRecording() {
     }
 }
 
-// ------------------------------------------------------------------
-// RECONOCIMIENTO DE VOZ (TRANSCRIPCIÓN EN TIEMPO REAL)
-// ------------------------------------------------------------------
 function iniciarReconocimiento() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -465,6 +462,10 @@ async function navegar(direccion) {
 }
 
 async function guardarRespuesta(respuesta) {
+    // Guardar la respuesta en el estado local para poder mostrarla al retroceder
+    const key = `${state.currentItemIdx}_${state.currentSubIdx}`;
+    state.answers[key] = respuesta;
+
     const formData = new FormData();
     formData.append('sessionId', state.sessionId);
     formData.append('itemIdx', state.currentItemIdx);
