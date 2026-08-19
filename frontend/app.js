@@ -296,12 +296,8 @@ async function startRecording() {
             if (e.data.size > 0) state.audioChunks.push(e.data);
         };
 
-        state.mediaRecorder.onstop = () => {
-            const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-            state.tieneAudio = true;
-            document.getElementById('btn-play-response').disabled = false;
-            document.getElementById('vu-meter').classList.remove('active');
-        };
+        // INICIAR RECONOCIMIENTO ANTES DE QUE EL MEDIA RECORDER EMPIECE A GRABAR
+        iniciarReconocimiento();
 
         state.mediaRecorder.start();
         state.isRecording = true;
@@ -309,7 +305,13 @@ async function startRecording() {
         document.getElementById('record-text').innerText = "grabando...";
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('Grabando...', 'success');
-        iniciarReconocimiento();
+
+        state.mediaRecorder.onstop = () => {
+            const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
+            state.tieneAudio = true;
+            document.getElementById('btn-play-response').disabled = false;
+            document.getElementById('vu-meter').classList.remove('active');
+        };
     } catch (e) {
         if (e.name === 'NotAllowedError') {
             mostrarStatus('Permiso de micrófono denegado.', 'error');
