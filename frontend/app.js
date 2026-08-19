@@ -161,7 +161,7 @@ async function cargarPregunta() {
 
     document.getElementById('btn-record').disabled = true;
     document.getElementById('btn-play-response').disabled = true;
-    document.getElementById('btn-confirmar').disabled = true;
+    document.getElementById('btn-submit').disabled = true;
     document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
     document.getElementById('btn-siguiente').disabled = false;
 
