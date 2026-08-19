@@ -184,60 +184,64 @@
             <button class="btn btn-secondary" onclick="mostrarMenu()">⬅ Volver al inicio</button>
         </div>
 
-        <!-- PORTAL DE ENTREVISTA -->
-        <div id="view-entrevista" class="hidden">
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px;">
-                    <div style="background: var(--surface); border-radius: var(--radius-md); padding: 12px 16px; flex-grow: 1; border: 1px solid var(--border);">
-                        <span id="instruction-text" style="color: var(--text-primary); font-size: 15px;">Por favor escuche el contexto y responda la pregunta 1 de 3.</span>
-                    </div>
-                    <div class="hex-wrapper">
-                        <svg class="hex-icon" viewBox="0 0 100 100">
-                            <line id="side-1" class="hex-side active" x1="50" y1="10" x2="85" y2="30" />
-                            <line id="side-2" class="hex-side" x1="85" y1="30" x2="85" y2="70" />
-                            <line id="side-3" class="hex-side" x1="85" y1="70" x2="50" y2="90" />
-                            <line id="side-4" class="hex-side" x1="50" y1="90" x2="15" y2="70" />
-                            <line id="side-5" class="hex-side" x1="15" y1="70" x2="15" y2="30" />
-                            <line id="side-6" class="hex-side" x1="15" y1="30" x2="50" y2="10" />
-                        </svg>
-                        <div class="hex-label" id="hex-label-text">1RA PREGUNTA</div>
-                    </div>
-                </div>
+<!-- PORTAL DE ENTREVISTA (Diseño optimizado para móviles) -->
+<div id="view-entrevista" class="hidden">
+    <div class="card">
+        <!-- 1. ARRIBA: Cuadro de texto (Transcripción y Pregunta) -->
+        <div style="margin-bottom: 12px;">
+            <textarea id="transcription-box" 
+                      placeholder="Por favor escuche el contexto y responda la pregunta 1 de 3..." 
+                      style="min-height: 120px; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 15px; line-height: 1.65; color: var(--text-primary); background: var(--surface); resize: vertical; font-family: inherit; outline: none;">
+            </textarea>
+        </div>
 
-                <div class="audio-player-box">
-                    <audio id="context-audio" controls style="width: 100%;"></audio>
-                </div>
-
-                <div class="action-buttons">
-                    <button class="btn-action btn-record" id="btn-record">
-                        <span id="record-icon">🎙️</span> 
-                        <span id="record-text">grabar su opinión</span>
-                        <div class="vu-meter" id="vu-meter">
-                            <div class="vu-bar" style="height: 6px;"></div>
-                            <div class="vu-bar" style="height: 14px;"></div>
-                            <div class="vu-bar" style="height: 10px;"></div>
-                            <div class="vu-bar" style="height: 18px;"></div>
-                            <div class="vu-bar" style="height: 8px;"></div>
-                        </div>
-                    </button>
-                    <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" disabled>
-                        ▶️ Escuchar su respuesta
-                    </button>
-                </div>
-
-                <textarea id="transcription-box" placeholder="Verifique y corrija su respuesta acá si es necesario..."></textarea>
-
-                <div class="footer-navigation" style="margin-top: 16px;">
-                    <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
-                    <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar envío</button>
-                    <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
-                </div>
-
-                <a href="#" class="home-link" onclick="mostrarMenu()">🏠 Volver al inicio</a>
-                <div id="status-msg" class="status-msg hidden"></div>
+        <!-- 2. EN EL MEDIO: Reproductor de Audio y Hexágono -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px;">
+            <div class="audio-player-box" style="flex-grow: 1; background: var(--surface); border-radius: var(--radius-md); padding: 10px 12px; border: 1px solid var(--border);">
+                <audio id="context-audio" controls style="width: 100%;"></audio>
+            </div>
+            <div class="hex-wrapper">
+                <svg class="hex-icon" viewBox="0 0 100 100">
+                    <line id="side-1" class="hex-side active" x1="50" y1="10" x2="85" y2="30" />
+                    <line id="side-2" class="hex-side" x1="85" y1="30" x2="85" y2="70" />
+                    <line id="side-3" class="hex-side" x1="85" y1="70" x2="50" y2="90" />
+                    <line id="side-4" class="hex-side" x1="50" y1="90" x2="15" y2="70" />
+                    <line id="side-5" class="hex-side" x1="15" y1="70" x2="15" y2="30" />
+                    <line id="side-6" class="hex-side" x1="15" y1="30" x2="50" y2="10" />
+                </svg>
+                <div class="hex-label" id="hex-label-text">1RA PREGUNTA</div>
             </div>
         </div>
+
+        <!-- 3. ABAJO: Botones de Acción (Grabar y Escuchar) -->
+        <div class="action-buttons" style="margin-bottom: 12px;">
+            <button class="btn-action btn-record" id="btn-record" style="flex: 2;">
+                <span id="record-icon">🎙️</span> 
+                <span id="record-text">grabar su opinión</span>
+                <div class="vu-meter" id="vu-meter">
+                    <div class="vu-bar" style="height: 6px;"></div>
+                    <div class="vu-bar" style="height: 14px;"></div>
+                    <div class="vu-bar" style="height: 10px;"></div>
+                    <div class="vu-bar" style="height: 18px;"></div>
+                    <div class="vu-bar" style="height: 8px;"></div>
+                </div>
+            </button>
+            <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" disabled>
+                ▶️ Escuchar su respuesta
+            </button>
+        </div>
+
+        <!-- Navegación Inferior -->
+        <div class="footer-navigation">
+            <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
+            <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar envío</button>
+            <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
+        </div>
+
+        <a href="#" class="home-link" onclick="mostrarMenu()">🏠 Volver al inicio</a>
+        <div id="status-msg" class="status-msg hidden"></div>
     </div>
+</div>
     <script src="app.js"></script>
 </body>
 </html>
