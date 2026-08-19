@@ -47,18 +47,17 @@ function selectRole(role) {
 
 async function cargarPerfiles() {
     try {
-        const res = await fetch(`${API_BASE}/perfiles`);
-        const data = await res.json();
-        const sel = document.getElementById('perfil-experto');
-        data.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = p.nombre;
-            sel.appendChild(opt);
-        });
-    } catch (e) {
-        console.error('Error cargando perfiles:', e);
-    }
+    const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
+    const data = await res.json();
+    const totalPreguntas = state.items.length * 3;
+    document.getElementById('instruction-text').innerHTML = data.texto.replace(
+        /Pregunta número \d+/,
+        `Pregunta Número ${globalIdx} de ${totalPreguntas}`
+    );
+} catch (e) {
+    document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${state.items.length * 3}`;
+}
+
 }
 
 document.getElementById('perfil-experto').addEventListener('change', (e) => {
