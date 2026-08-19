@@ -368,6 +368,12 @@ function stopRecording() {
     mostrarStatus('Grabación finalizada.', 'success');
     document.getElementById('vu-meter').classList.remove('active');
 
+    // Agregar el mensaje instructivo en el cuadro de texto
+    const tb = document.getElementById('transcription-box');
+    if (!tb.value.trim()) {
+        tb.placeholder = "✅ Grabación finalizada. Si no te gusta, borra y vuelve a grabar.";
+    }
+
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
         state.stream = null;
@@ -405,25 +411,27 @@ function iniciarReconocimiento() {
 
     state.recognition.onresult = (event) => {
         let interimTranscript = '';
-        let finalChunk = '';
+        let finalTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalChunk += transcript;
+                finalTranscript += transcript + ' ';
             } else {
                 interimTranscript += transcript;
             }
         }
 
-        if (finalChunk) {
-            state.transcripcion = (state.transcripcion || '') + ' ' + finalChunk.trim();
+        // Si hay texto definitivo, lo guardamos en el estado
+        if (finalTranscript) {
+            state.transcripcion = finalTranscript.trim();
         }
 
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
 
-        const textoActual = (state.transcripcion || '').trim();
+        // Mostrar el definitivo + el provisional (sin duplicar)
+        const textoActual = state.transcripcion || '';
         const textoCompleto = interimTranscript 
             ? `${textoActual} ${interimTranscript}`.trim() 
             : textoActual;
