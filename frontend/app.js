@@ -296,7 +296,7 @@ async function startRecording() {
             if (e.data.size > 0) state.audioChunks.push(e.data);
         };
 
-        // INICIAR RECONOCIMIENTO ANTES DE QUE EL MEDIA RECORDER EMPIECE A GRABAR
+        // INICIAR RECONOCIMIENTO ANTES DE GRABAR (CRÍTICO PARA MÓVILES)
         iniciarReconocimiento();
 
         state.mediaRecorder.start();
