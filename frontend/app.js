@@ -1,4 +1,4 @@
-// app.js - Versión final con barra de progreso y temporizador
+// app.js - Versión con fusión de audios e indicador visual
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -22,7 +22,9 @@ let state = {
     touchStarted: false,
     mouseStarted: false,
     recordingStartTime: 0,
-    recordingTimer: null
+    recordingTimer: null,
+    itemPlayed: false,
+    questionPlayed: false
 };
 
 function mostrarMenu() {
@@ -139,6 +141,29 @@ async function iniciarEntrevistaNoExperto() {
     }
 }
 
+function updateStatusIndicator() {
+    const indicator = document.getElementById('status-indicator');
+    if (!indicator) return;
+    
+    if (state.isRecording) {
+        indicator.className = 'status-indicator recording';
+        indicator.style.background = 'var(--danger)';
+        indicator.style.borderColor = 'var(--danger)';
+    } else if (state.itemPlayed && state.questionPlayed) {
+        indicator.className = 'status-indicator ready';
+        indicator.style.background = 'var(--success-light)';
+        indicator.style.borderColor = 'var(--success)';
+    } else if (state.itemPlayed) {
+        indicator.className = 'status-indicator listening';
+        indicator.style.background = 'var(--accent-light)';
+        indicator.style.borderColor = 'var(--accent)';
+    } else {
+        indicator.className = 'status-indicator locked';
+        indicator.style.background = 'var(--danger-light)';
+        indicator.style.borderColor = 'var(--danger)';
+    }
+}
+
 async function cargarPregunta() {
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
@@ -153,12 +178,15 @@ async function cargarPregunta() {
     state.tieneAudio = false;
     state.isRecognizing = false;
     state.isRecording = false;
+    state.itemPlayed = false;
+    state.questionPlayed = false;
 
     document.getElementById('btn-record').disabled = true;
     document.getElementById('btn-play-response').disabled = true;
     document.getElementById('btn-confirmar').disabled = true;
     document.getElementById('btn-anterior').disabled = (itemIdx === 0 && subIdx === 0);
     document.getElementById('btn-siguiente').disabled = false;
+    document.getElementById('btn-clear').disabled = false;
 
     const ca = document.getElementById('context-audio');
     ca.pause();
@@ -168,12 +196,17 @@ async function cargarPregunta() {
     tb.value = respuestaGuardada;
     tb.placeholder = respuestaGuardada ? '' : 'Verifique y corrija su respuesta acá si es necesario...';
 
-    // Actualizar barra de progreso
+    // Actualizar contador y barra de progreso
     const totalPreguntas = state.items.length * 3;
+    document.getElementById('question-counter').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
     const pct = ((globalIdx) / totalPreguntas) * 100;
     document.getElementById('progress-fill').style.width = pct + '%';
 
+    // Actualizar indicador visual
+    updateStatusIndicator();
+
     if (state.role === 'experto' && subIdx === 0) {
+        // Cargar el audio del ítem (previo) primero
         try {
             const res = await fetch(`${API_BASE}/item/${itemNum}`);
             const data = await res.json();
@@ -189,6 +222,9 @@ async function cargarPregunta() {
         document.getElementById('context-audio').load();
         const player = document.getElementById('context-audio');
         player.onended = () => {
+            state.itemPlayed = true;
+            updateStatusIndicator();
+            // Cuando el ítem termina, cargar la primera pregunta automáticamente
             cargarPreguntaReal(itemNum, subIdx, globalIdx);
         };
         player.onerror = () => {
@@ -208,22 +244,23 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
     document.getElementById('context-audio').src = audioUrl;
     document.getElementById('context-audio').load();
 
-try {
-    const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
-    const data = await res.json();
-    const totalPreguntas = state.items.length * 3;
-    // Reemplazar cualquier texto que contenga "Pregunta número" por el formato correcto
-    document.getElementById('instruction-text').innerHTML = data.texto.replace(
-        /Pregunta número \d+(.*)?/,
-        `Pregunta Número ${globalIdx} de ${totalPreguntas}`
-    );
-} catch (e) {
-    const totalPreguntas = state.items.length * 3;
-    document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
-}
+    try {
+        const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
+        const data = await res.json();
+        const totalPreguntas = state.items.length * 3;
+        document.getElementById('instruction-text').innerHTML = data.texto.replace(
+            /Pregunta número \d+/,
+            `Pregunta Número ${globalIdx} de ${totalPreguntas}`
+        );
+    } catch (e) {
+        const totalPreguntas = state.items.length * 3;
+        document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
+    }
 
     const player = document.getElementById('context-audio');
     player.onended = () => {
+        state.questionPlayed = true;
+        updateStatusIndicator();
         state.isPlaying = false;
         document.getElementById('btn-record').disabled = false;
         document.getElementById('btn-play-response').disabled = false;
@@ -255,9 +292,6 @@ function actualizarHexagono() {
     }
 }
 
-// ------------------------------------------------------------------
-// GRABACIÓN ESTILO "MANTENER PRESIONADO" (Widget mejorado)
-// ------------------------------------------------------------------
 function setupRecordButton() {
     const btn = document.getElementById('btn-record');
     
@@ -328,8 +362,8 @@ async function startRecording() {
         mostrarStatus('Grabando...', 'success');
 
         iniciarReconocimiento();
+        updateStatusIndicator();
 
-        // Temporizador de grabación
         if (state.recordingTimer) clearInterval(state.recordingTimer);
         state.recordingTimer = setInterval(() => {
             const elapsed = Math.floor((Date.now() - state.recordingStartTime) / 1000);
@@ -348,6 +382,7 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
+            updateStatusIndicator();
         };
     } catch (e) {
         if (e.name === 'NotAllowedError') {
@@ -367,12 +402,7 @@ function stopRecording() {
     document.getElementById('record-text').innerText = "grabar su opinión";
     mostrarStatus('Grabación finalizada.', 'success');
     document.getElementById('vu-meter').classList.remove('active');
-
-    // Agregar el mensaje instructivo en el cuadro de texto
-    const tb = document.getElementById('transcription-box');
-    if (!tb.value.trim()) {
-        tb.placeholder = "✅ Grabación finalizada. Si no te gusta, borra y vuelve a grabar.";
-    }
+    updateStatusIndicator();
 
     if (state.stream) {
         state.stream.getTracks().forEach(track => track.stop());
@@ -422,7 +452,6 @@ function iniciarReconocimiento() {
             }
         }
 
-        // Si hay texto definitivo, lo guardamos en el estado
         if (finalTranscript) {
             state.transcripcion = finalTranscript.trim();
         }
@@ -430,7 +459,6 @@ function iniciarReconocimiento() {
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
 
-        // Mostrar el definitivo + el provisional (sin duplicar)
         const textoActual = state.transcripcion || '';
         const textoCompleto = interimTranscript 
             ? `${textoActual} ${interimTranscript}`.trim() 
@@ -469,6 +497,18 @@ function playResponse() {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     audio.play();
+}
+
+function borrarRespuesta() {
+    const tb = document.getElementById('transcription-box');
+    tb.value = '';
+    state.transcripcion = '';
+    state.tieneAudio = false;
+    state.audioChunks = [];
+    document.getElementById('btn-play-response').disabled = true;
+    document.getElementById('btn-confirmar').disabled = true;
+    mostrarStatus('Respuesta borrada.', 'info');
+    updateStatusIndicator();
 }
 
 async function confirmarEnvio() {
