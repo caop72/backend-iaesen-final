@@ -117,6 +117,15 @@ def procesar_sincronizacion_unitaria(respuesta_id: int):
     
     nombre, email, grado, cargo, institucion, perfil, item_idx, sub_idx, transcripcion, created_at = row
     
+    # -----------------------------------------------------------------
+    # CORRECCIÓN: Buscar el nombre real del perfil en la matriz global
+    nombre_perfil = perfil  # Por defecto, si no lo encuentra, queda el código
+    for key, val in matriz.items():
+        if val["id"] == perfil:
+            nombre_perfil = val["nombre"]
+            break
+    # -----------------------------------------------------------------
+    
     try:
         service = obtener_servicio_sheets()
         sheet_id = "1GJYdj0DK2U_FGMqHvt4QrOPOHrvWLb1TcjsbQ4NcIkY"
@@ -132,7 +141,7 @@ def procesar_sincronizacion_unitaria(respuesta_id: int):
             grado or "",
             cargo or "",
             institucion or "",
-            perfil or "",
+            nombre_perfil or "",  # <--- AHORA ENVÍA EL NOMBRE COMPLETO
             codigo,
             ambito,
             "Técnica-Cibernética",
