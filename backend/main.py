@@ -244,7 +244,11 @@ async def guardar_respuesta(
     
     audio_path = None
     if audio:
-        audio_path = f"/data/audios_respuestas/{sessionId}_{itemIdx}_{subIdx}_audio.webm"
+        # Crear directorio si no existe
+        AUDIO_RESPUESTAS_DIR = "/data/audios_respuestas"
+        os.makedirs(AUDIO_RESPUESTAS_DIR, exist_ok=True)
+        
+        audio_path = os.path.join(AUDIO_RESPUESTAS_DIR, f"{sessionId}_{itemIdx}_{subIdx}_audio.webm")
         async with aiofiles.open(audio_path, 'wb') as f:
             await f.write(await audio.read())
 
