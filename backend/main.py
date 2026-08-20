@@ -37,7 +37,7 @@ AUDIO_BASE = "/opt/render/project/src/backend/audios"
 DB_PATH = "entrevistas.db"
 
 # Crear carpeta de audios si no existe (para respuestas de usuario)
-AUDIO_RESPUESTAS_DIR = "/data/audios_respuestas"
+AUDIO_RESPUESTAS_DIR = "/opt/render/project/src/backend/audios_respuestas"
 os.makedirs(AUDIO_RESPUESTAS_DIR, exist_ok=True)
 
 # ----------------- FUNCIONES DE BASE DE DATOS -----------------
