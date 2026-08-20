@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 DB_PATH = "entrevistas.db"
-AUDIO_BASE = os.path.join(os.path.dirname(__file__), "audios")
+AUDIO_BASE = "/opt/render/project/src/backend/audios"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
