@@ -3,7 +3,9 @@ import sqlite3
 import uuid
 import json
 import datetime
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+import asyncio
+import logging
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import aiofiles
@@ -11,18 +13,34 @@ from typing import Optional
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+# Configuración de logging para ver errores en Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("uvicorn.error")
+
 app = FastAPI()
 
+# ----------------- CONFIGURACIÓN CORS SEGURA -----------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://caop72.github.io", 
+        "https://backend-iaesen-final.onrender.com"
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-DB_PATH = "entrevistas.db"
+# ----------------- RUTAS DE ARCHIVOS Y BASE DE DATOS -----------------
+# RUTA ABSOLUTA PARA RENDER CON DISCO MONTADO
 AUDIO_BASE = "/opt/render/project/src/backend/audios"
+DB_PATH = "entrevistas.db"
 
+# Crear carpeta de audios si no existe (para respuestas de usuario)
+AUDIO_RESPUESTAS_DIR = "/data/audios_respuestas"
+os.makedirs(AUDIO_RESPUESTAS_DIR, exist_ok=True)
+
+# ----------------- FUNCIONES DE BASE DE DATOS -----------------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -47,7 +65,8 @@ def init_db():
         video_path TEXT,
         transcripcion TEXT,
         lang TEXT,
-        sync_status TEXT DEFAULT 'pending',
+        sync_status TEXT DEFAULT 'pendiente',
+        sync_attempts INTEGER DEFAULT 0,
         sync_error TEXT,
         synced_at TIMESTAMP,
         created_at TIMESTAMP
@@ -67,6 +86,7 @@ def cargar_matriz():
 init_db()
 matriz = cargar_matriz()
 
+# ----------------- FUNCIONES DE GOOGLE SHEETS -----------------
 def obtener_servicio_sheets():
     raw = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if not raw:
@@ -78,9 +98,12 @@ def obtener_servicio_sheets():
     )
     return build("sheets", "v4", credentials=credentials, cache_discovery=False)
 
-def sincronizar_respuesta(respuesta_id: int):
+def procesar_sincronizacion_unitaria(respuesta_id: int):
+    """Función síncrona bloqueante para ejecutar dentro del worker"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    
+    # Obtener datos de la respuesta
     c.execute('''SELECT s.nombre, s.email, s.grado, s.cargo, s.institucion, s.perfil,
                         r.item_idx, r.sub_idx, r.transcripcion, r.created_at
                  FROM respuestas r
@@ -88,8 +111,9 @@ def sincronizar_respuesta(respuesta_id: int):
                  WHERE r.id = ?''', (respuesta_id,))
     row = c.fetchone()
     conn.close()
+    
     if not row:
-        return
+        return False, "No se encontró la respuesta o sesión"
     
     nombre, email, grado, cargo, institucion, perfil, item_idx, sub_idx, transcripcion, created_at = row
     
@@ -99,25 +123,23 @@ def sincronizar_respuesta(respuesta_id: int):
         sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheet_name = sheet_metadata['sheets'][0]['properties']['title']
         
-        # GENERAR CÓDIGO Y ÁMBITO (si no existen en la BD)
-        codigo = f"P{item_idx + 1}"  # Código basado en pregunta
-        ambito = "Seguridad de la Nación"  # Ámbito fijo
+        codigo = f"P{item_idx + 1}"
+        ambito = "Seguridad de la Nación"
         
-        # 13 COLUMNAS EN EL ORDEN CORRECTO
         valores = [[
-            nombre or "",                # 1. Participante
-            email or "",                 # 2. Correo
-            grado or "",                 # 3. Grado
-            cargo or "",                 # 4. Cargo
-            institucion or "",           # 5. Institución
-            perfil or "",                # 6. Perfil
-            codigo,                      # 7. Código
-            ambito,                      # 8. Ámbito
-            "Técnica-Cibernética",       # 9. Dimensión
-            item_idx + 1,                # 10. Pregunta Index
-            f"Pregunta {item_idx + 1}",  # 11. Pregunta
-            transcripcion or "",         # 12. Respuesta
-            created_at.isoformat() if created_at else datetime.datetime.now().isoformat()  # 13. Fecha
+            nombre or "",
+            email or "",
+            grado or "",
+            cargo or "",
+            institucion or "",
+            perfil or "",
+            codigo,
+            ambito,
+            "Técnica-Cibernética",
+            item_idx + 1,
+            f"Pregunta {item_idx + 1}",
+            transcripcion or "",
+            created_at.isoformat() if created_at else datetime.datetime.now().isoformat()
         ]]
         
         service.spreadsheets().values().append(
@@ -128,26 +150,27 @@ def sincronizar_respuesta(respuesta_id: int):
             body={"values": valores}
         ).execute()
         
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''UPDATE respuestas SET sync_status = 'synced', synced_at = ? WHERE id = ?''',
-                  (datetime.datetime.now().isoformat(), respuesta_id))
-        conn.commit()
-        conn.close()
+        return True, None
     except Exception as e:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute('''UPDATE respuestas SET sync_status = 'failed', sync_error = ? WHERE id = ?''',
-                  (str(e), respuesta_id))
-        conn.commit()
-        conn.close()
-        raise e
+        return False, str(e)
+
+# ----------------- ENDPOINTS PÚBLICOS (RÁPIDOS) -----------------
+
+@app.get("/")
+async def root():
+    return {"mensaje": "API IAESEN funcionando"}
 
 @app.post("/api/sesion")
-async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None), 
-                       nombre: Optional[str] = Form(None), email: Optional[str] = Form(None),
-                       cargo: Optional[str] = Form(None), institucion: Optional[str] = Form(None),
-                       grado: Optional[str] = Form(None), lang: str = Form("es-VE")):
+async def crear_sesion(
+    role: str = Form(...), 
+    perfil: Optional[str] = Form(None), 
+    nombre: Optional[str] = Form(None), 
+    email: Optional[str] = Form(None),
+    cargo: Optional[str] = Form(None), 
+    institucion: Optional[str] = Form(None),
+    grado: Optional[str] = Form(None), 
+    lang: str = Form("es-VE")
+):
     session_id = str(uuid.uuid4())
     items = []
     if role == "experto" and perfil:
@@ -164,6 +187,7 @@ async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None)
         cargo = "Particular"
         institucion = "Ciudadano"
         grado = "Ciudadano"
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''INSERT INTO sesiones (id, role, perfil, nombre, email, institucion, grado, cargo, lang, created_at)
@@ -171,6 +195,7 @@ async def crear_sesion(role: str = Form(...), perfil: Optional[str] = Form(None)
               (session_id, role, perfil, nombre, email, institucion, grado, cargo, lang, datetime.datetime.now()))
     conn.commit()
     conn.close()
+    
     return JSONResponse({
         "sessionId": session_id,
         "items": items,
@@ -209,9 +234,11 @@ async def get_audio(tipo: str, numero: int):
         nombre_archivo = f"i{numero}.mp3"
     else:
         raise HTTPException(400, "Tipo de audio no válido")
+    
     archivo = os.path.join(AUDIO_BASE, nombre_archivo)
     if not os.path.exists(archivo):
         raise HTTPException(404, "Audio no encontrado")
+    
     return FileResponse(archivo, media_type="audio/mpeg")
 
 @app.get("/api/pregunta/{numero}")
@@ -226,7 +253,6 @@ async def get_pregunta(numero: int, lang: str = "es-VE"):
 
 @app.post("/api/respuesta")
 async def guardar_respuesta(
-    background_tasks: BackgroundTasks,
     sessionId: str = Form(...),
     itemIdx: int = Form(...),
     subIdx: int = Form(...),
@@ -234,20 +260,14 @@ async def guardar_respuesta(
     perfil: str = Form(...),
     audio: Optional[UploadFile] = File(None)
 ):
-    # Si no hay texto y no hay audio, rechazar
     if not transcripcion.strip() and audio is None:
         raise HTTPException(422, "Debe proporcionar transcripción o audio")
     
-    # Si no hay transcripción, usar un placeholder para que el backend no falle
     if not transcripcion.strip():
         transcripcion = "[Respuesta de voz]"
     
     audio_path = None
     if audio:
-        # Crear directorio si no existe
-        AUDIO_RESPUESTAS_DIR = "/data/audios_respuestas"
-        os.makedirs(AUDIO_RESPUESTAS_DIR, exist_ok=True)
-        
         audio_path = os.path.join(AUDIO_RESPUESTAS_DIR, f"{sessionId}_{itemIdx}_{subIdx}_audio.webm")
         async with aiofiles.open(audio_path, 'wb') as f:
             await f.write(await audio.read())
@@ -262,12 +282,11 @@ async def guardar_respuesta(
     conn.commit()
     conn.close()
 
-    background_tasks.add_task(sincronizar_respuesta, respuesta_id)
-    
+    # RESPUESTA INMEDIATA. NADA DE SINCRONIZACIÓN AQUÍ.
     return JSONResponse({
         "status": "saved",
         "respuesta_id": respuesta_id,
-        "sync_status": "queued"
+        "sync_status": "pendiente"
     })
 
 @app.get("/api/admin/dashboard")
@@ -278,7 +297,7 @@ async def dashboard():
     total_respuestas = c.fetchone()[0]
     c.execute("SELECT COUNT(DISTINCT sesion_id) FROM respuestas")
     total_sesiones = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed'")
+    c.execute("SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pendiente' OR sync_status = 'error_reintentando'")
     videos_pendientes = c.fetchone()[0]
     conn.close()
     return JSONResponse({
@@ -287,25 +306,43 @@ async def dashboard():
         "videosPendientes": videos_pendientes
     })
 
-@app.post("/api/admin/sincronizar")
-async def sincronizar():
+# ----------------- ENDPOINT DE SINCRONIZACIÓN POR LOTE (Cron) -----------------
+# AHORA SIN CLAVE INVENTADA, SOLO USA GOOGLE_CREDENTIALS_JSON
+@app.post("/api/admin/procesar-pendientes")
+async def procesar_pendientes():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''SELECT id FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' LIMIT 100''')
+    
+    c.execute('''SELECT id FROM respuestas 
+                 WHERE sync_status = 'pendiente' OR sync_status = 'error_reintentando'
+                 ORDER BY created_at ASC LIMIT 10''') # Lote pequeño para evitar timeouts
     pendientes = [row[0] for row in c.fetchall()]
     conn.close()
-    for pid in pendientes:
-        try:
-            sincronizar_respuesta(pid)
-        except:
-            pass
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pending' OR sync_status = 'failed' ''')
-    restantes = c.fetchone()[0]
-    conn.close()
+    
+    resultados = {"procesados": 0, "exitosos": 0, "fallidos": 0}
+    
+    for resp_id in pendientes:
+        resultados["procesados"] += 1
+        exito, error = procesar_sincronizacion_unitaria(resp_id)
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        if exito:
+            c.execute('''UPDATE respuestas SET sync_status = 'sincronizado', sync_error = NULL, sync_attempts = 0, synced_at = ? WHERE id = ?''',
+                      (datetime.datetime.now().isoformat(), resp_id))
+            resultados["exitosos"] += 1
+        else:
+            c.execute('''UPDATE respuestas SET sync_status = 'error_reintentando', sync_error = ?, sync_attempts = sync_attempts + 1 WHERE id = ?''',
+                      (error, resp_id))
+            resultados["fallidos"] += 1
+            logger.error(f"Fallo sincronización ID {resp_id}: {error}")
+        conn.commit()
+        conn.close()
+    
     return JSONResponse({
-        "mensaje": f"Procesados {len(pendientes)} registros. Pendientes: {restantes}."
+        "ok": True,
+        "resumen": resultados,
+        "mensaje": f"Procesados: {resultados['procesados']}. Exitosos: {resultados['exitosos']}. Fallidos: {resultados['fallidos']}."
     })
 
 if __name__ == "__main__":
