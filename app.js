@@ -1,4 +1,4 @@
-// app.js - Versión final con todas las correcciones del análisis
+// app.js - Versión final con reconocimiento de voz corregido
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -55,6 +55,7 @@ async function cargarPerfiles() {
         const res = await fetch(`${API_BASE}/perfiles`);
         const data = await res.json();
         const sel = document.getElementById('perfil-experto');
+        sel.innerHTML = '<option value="">-- Seleccione --</option>';
         data.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p.id;
@@ -63,6 +64,7 @@ async function cargarPerfiles() {
         });
     } catch (e) {
         console.error('Error cargando perfiles:', e);
+        mostrarStatus('Error al cargar perfiles', 'error');
     }
 }
 
@@ -76,10 +78,10 @@ document.getElementById('perfil-experto').addEventListener('change', (e) => {
 
 async function iniciarEntrevistaExperto() {
     const perfil = document.getElementById('perfil-experto').value;
-    const nombre = document.getElementById('nombre').value;
-    const email = document.getElementById('email').value;
-    const cargo = document.getElementById('cargo').value;
-    const institucion = document.getElementById('institucion').value;
+    const nombre = document.getElementById('nombre').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const cargo = document.getElementById('cargo').value.trim();
+    const institucion = document.getElementById('institucion').value.trim();
     const grado = document.getElementById('grado').value;
 
     if (!perfil || !nombre || !email || !cargo) {
@@ -110,9 +112,11 @@ async function iniciarEntrevistaExperto() {
         state.items = data.items;
         state.currentItemIdx = 0;
         state.currentSubIdx = 0;
+        state.answers = {};
         showView('view-entrevista');
         cargarPregunta();
     } catch (e) {
+        console.error('Error:', e);
         mostrarStatus('Error al iniciar la entrevista.', 'error');
     }
 }
@@ -133,9 +137,11 @@ async function iniciarEntrevistaNoExperto() {
         state.items = data.items;
         state.currentItemIdx = 0;
         state.currentSubIdx = 0;
+        state.answers = {};
         showView('view-entrevista');
         cargarPregunta();
     } catch (e) {
+        console.error('Error:', e);
         mostrarStatus('Error al iniciar la entrevista.', 'error');
     }
 }
@@ -195,8 +201,15 @@ async function cargarPregunta() {
     const key = `${itemIdx}_${subIdx}`;
     const respuestaGuardada = state.answers[key] || '';
 
-    state.textoManual = '';
-    state.transcripcionFinal = '';
+    // Mantener la transcripción si hay respuesta guardada
+    if (!respuestaGuardada) {
+        state.textoManual = '';
+        state.transcripcionFinal = '';
+    } else {
+        state.transcripcionFinal = respuestaGuardada;
+        state.textoManual = respuestaGuardada;
+    }
+    
     state.tieneAudio = false;
     state.isRecognizing = false;
     state.isRecording = false;
@@ -246,9 +259,8 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
     player.src = audioUrl;
     player.load();
 
-    // Intento de reproducción automática (el usuario ya hizo clic en "Iniciar")
     player.play().catch(() => {
-        console.warn('Autoplay bloqueado. El usuario debe hacer clic manualmente.');
+        console.warn('Autoplay bloqueado.');
     });
 
     try {
@@ -365,8 +377,9 @@ async function startRecording() {
         document.getElementById('btn-record').classList.add('recording');
         document.getElementById('record-text').innerText = "grabando...";
         document.getElementById('vu-meter').classList.add('active');
-        mostrarStatus('Grabando...', 'success');
+        mostrarStatus('🎤 Grabando y escuchando...', 'success');
 
+        // Iniciar reconocimiento de voz
         iniciarReconocimiento();
 
         if (state.recordingTimer) clearInterval(state.recordingTimer);
@@ -387,11 +400,18 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
+            // Detener reconocimiento
+            if (state.recognition && state.isRecognizing) {
+                try {
+                    state.recognition.stop();
+                } catch (e) {}
+            }
         };
     } catch (e) {
         if (e.name === 'NotAllowedError') {
-            mostrarStatus('Permiso de micrófono denegado.', 'error');
+            mostrarStatus('❌ Permiso de micrófono denegado. Habilítelo en la configuración del navegador.', 'error');
         } else {
+            console.error('Error al iniciar grabación:', e);
             mostrarStatus('Error al iniciar la grabación.', 'error');
         }
     }
@@ -416,20 +436,17 @@ function stopRecording() {
 function iniciarReconocimiento() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        mostrarStatus('Este navegador no soporta reconocimiento de voz.', 'error');
+        mostrarStatus('❌ Este navegador no soporta reconocimiento de voz.', 'error');
         return;
     }
 
-    const idiomas = ['es-VE', 'es-419', 'es-ES'];
-    let lang = idiomas.find(l => {
-        try {
-            const test = new SpeechRecognition();
-            test.lang = l;
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }) || 'es-ES';
+    // Si ya hay una instancia activa, no crear otra
+    if (state.recognition && state.isRecognizing) {
+        console.log('Reconocimiento ya activo');
+        return;
+    }
+
+    const lang = 'es-VE';
 
     state.recognition = new SpeechRecognition();
     state.recognition.lang = lang;
@@ -439,7 +456,7 @@ function iniciarReconocimiento() {
 
     state.recognition.onstart = () => {
         state.isRecognizing = true;
-        console.log('Reconocimiento iniciado con idioma:', lang);
+        console.log('🎤 Reconocimiento iniciado con idioma:', lang);
     };
 
     state.recognition.onresult = (event) => {
@@ -450,6 +467,7 @@ function iniciarReconocimiento() {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
                 finalText += transcript + ' ';
+                console.log('✅ Texto final:', finalText);
             } else {
                 interim += transcript;
             }
@@ -462,34 +480,53 @@ function iniciarReconocimiento() {
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
 
-        // MOSTRAR TEXTO EN EL CUADRO
         const mostrar = (state.transcripcionFinal || '') + (interim ? ' ' + interim : '');
         tb.value = mostrar.trim();
         tb.scrollTop = tb.scrollHeight;
-        
-        // GUARDAR EN STATE PARA QUE NO SE PIERDA
         state.textoManual = tb.value;
     };
 
     state.recognition.onerror = (event) => {
-        console.error('SpeechRecognition error:', event.error, event.message);
+        console.error('❌ SpeechRecognition error:', event.error);
+        
+        // Si el error es 'no-speech', no mostrar error, solo esperar
+        if (event.error === 'no-speech') {
+            console.log('🔇 No se detectó voz, continúa escuchando...');
+            return;
+        }
+        
+        // Si es 'aborted', es porque el usuario detuvo la grabación
+        if (event.error === 'aborted') {
+            console.log('Reconocimiento detenido por el usuario');
+            return;
+        }
+        
         const mensajes = {
-            'not-allowed': 'El navegador bloqueó el acceso al reconocimiento de voz.',
-            'audio-capture': 'No se detectó un micrófono disponible.',
-            'no-speech': 'No se detectó voz. Intente hablar más cerca del micrófono.',
-            'network': 'El servicio de reconocimiento no está disponible.',
-            'language-not-supported': 'El idioma seleccionado no es compatible.'
+            'not-allowed': '❌ Permiso de micrófono denegado.',
+            'audio-capture': '❌ No se detectó un micrófono.',
+            'network': '❌ Error de red en el servicio de voz.',
+            'language-not-supported': '❌ Idioma no soportado.'
         };
         mostrarStatus(mensajes[event.error] || `Error: ${event.error}`, 'error');
     };
 
     state.recognition.onend = () => {
         state.isRecognizing = false;
-        console.log('Reconocimiento finalizado');
+        console.log('🔇 Reconocimiento finalizado');
         const tb = document.getElementById('transcription-box');
         if (tb && state.transcripcionFinal) {
             tb.value = state.transcripcionFinal.trim();
             state.textoManual = tb.value;
+        }
+        
+        // Si el usuario sigue grabando, reiniciar el reconocimiento
+        if (state.isRecording) {
+            console.log('🔄 Reiniciando reconocimiento mientras graba...');
+            try {
+                state.recognition.start();
+            } catch (e) {
+                console.warn('No se pudo reiniciar el reconocimiento:', e);
+            }
         }
     };
 
@@ -497,7 +534,7 @@ function iniciarReconocimiento() {
         state.recognition.start();
     } catch (e) {
         console.warn('Error al iniciar reconocimiento:', e);
-        mostrarStatus('Error al iniciar el reconocimiento de voz. Intente de nuevo.', 'error');
+        mostrarStatus('Error al iniciar el reconocimiento de voz.', 'error');
     }
 }
 
@@ -529,17 +566,14 @@ async function confirmarEnvio() {
         return;
     }
     
-    // OBTENER EL TEXTO ACTUAL DEL CUADRO
     const tb = document.getElementById('transcription-box');
     let respuesta = tb.value.trim();
     
-    // SI EL CUADRO ESTÁ VACÍO PERO HAY TRANSCRIPCIÓN EN MEMORIA, USARLA
     if (!respuesta && state.transcripcionFinal) {
         respuesta = state.transcripcionFinal.trim();
-        tb.value = respuesta; // Mostrarlo en el cuadro
+        tb.value = respuesta;
     }
     
-    // SI NO HAY TEXTO PERO HAY AUDIO, USAR PLACEHOLDER
     if (!respuesta && state.tieneAudio) {
         respuesta = "[Respuesta de voz]";
         tb.value = respuesta;
@@ -610,7 +644,6 @@ async function guardarRespuesta(respuesta) {
     const key = `${state.currentItemIdx}_${state.currentSubIdx}`;
     state.answers[key] = respuesta;
 
-    // VALIDAR QUE LA RESPUESTA NO ESTÉ VACÍA
     let textoFinal = respuesta;
     if (!textoFinal || textoFinal.trim() === '') {
         console.warn('Respuesta vacía, usando placeholder');
@@ -643,7 +676,6 @@ async function guardarRespuesta(respuesta) {
         const data = await res.json();
         console.log('✅ Respuesta guardada:', data);
         
-        // FORZAR SINCRONIZACIÓN INMEDIATA
         await forzarSincronizacion();
         
         state.audioChunks = [];
