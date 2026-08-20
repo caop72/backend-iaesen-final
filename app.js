@@ -168,14 +168,12 @@ function cargarPrimeraPreguntaDeItem(itemIdx) {
     state.audioEscuchadoEnPreguntaActual = false;
     actualizarEstadoIndicador();
 
-    // 1. Reproducir el audio del ítem (previo)
     const previoSrc = `${API_BASE}/audio/item/${itemNum}`;
     audio.src = previoSrc;
     audio.load();
     audio.play().catch(() => {});
 
     audio.onended = () => {
-        // 2. Al terminar el previo, cargar automáticamente la primera pregunta
         const preguntaSrc = `${API_BASE}/audio/pregunta/${pIndex + 1}`;
         audio.src = preguntaSrc;
         audio.load();
@@ -235,7 +233,6 @@ async function cargarPregunta() {
         } catch (e) {
             document.getElementById('instruction-text').textContent = `Ítem ${itemNum}: Cargando...`;
         }
-        // Usar la nueva función de fusión de audios
         cargarPrimeraPreguntaDeItem(itemIdx);
         return;
     }
@@ -245,8 +242,14 @@ async function cargarPregunta() {
 
 async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
     const audioUrl = `${API_BASE}/audio/pregunta/${globalIdx}`;
-    document.getElementById('context-audio').src = audioUrl;
-    document.getElementById('context-audio').load();
+    const player = document.getElementById('context-audio');
+    player.src = audioUrl;
+    player.load();
+
+    // Intento de reproducción automática (el usuario ya hizo clic en "Iniciar")
+    player.play().catch(() => {
+        console.warn('Autoplay bloqueado. El usuario debe hacer clic manualmente.');
+    });
 
     try {
         const res = await fetch(`${API_BASE}/pregunta/${globalIdx}`);
@@ -261,7 +264,6 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         document.getElementById('instruction-text').textContent = `Pregunta Número ${globalIdx} de ${totalPreguntas}`;
     }
 
-    const player = document.getElementById('context-audio');
     player.onended = () => {
         state.audioEscuchadoEnPreguntaActual = true;
         actualizarEstadoIndicador();
@@ -444,7 +446,6 @@ function iniciarReconocimiento() {
         let interim = '';
         let finalText = '';
 
-        // Recorrer TODOS los resultados, no solo desde resultIndex
         for (let i = 0; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
@@ -481,7 +482,6 @@ function iniciarReconocimiento() {
     state.recognition.onend = () => {
         state.isRecognizing = false;
         console.log('Reconocimiento finalizado');
-        // Limpiar el texto provisional y dejar solo el final
         const tb = document.getElementById('transcription-box');
         if (tb) {
             tb.value = (state.transcripcionFinal || '').trim();
