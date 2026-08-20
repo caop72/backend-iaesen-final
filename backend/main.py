@@ -81,7 +81,7 @@ def obtener_servicio_sheets():
 def sincronizar_respuesta(respuesta_id: int):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('''SELECT s.nombre, s.email, s.grado, s.cargo, s.institucion, s.perfil, s.codigo, s.ambito, 
+    c.execute('''SELECT s.nombre, s.email, s.grado, s.cargo, s.institucion, s.perfil,
                         r.item_idx, r.sub_idx, r.transcripcion, r.created_at
                  FROM respuestas r
                  JOIN sesiones s ON r.sesion_id = s.id
@@ -91,7 +91,7 @@ def sincronizar_respuesta(respuesta_id: int):
     if not row:
         return
     
-    nombre, email, grado, cargo, institucion, perfil, codigo, ambito, item_idx, sub_idx, transcripcion, created_at = row
+    nombre, email, grado, cargo, institucion, perfil, item_idx, sub_idx, transcripcion, created_at = row
     
     try:
         service = obtener_servicio_sheets()
@@ -99,21 +99,25 @@ def sincronizar_respuesta(respuesta_id: int):
         sheet_metadata = service.spreadsheets().get(spreadsheetId=sheet_id).execute()
         sheet_name = sheet_metadata['sheets'][0]['properties']['title']
         
-        # SE ENVÍAN LAS 13 COLUMNAS EN EL ORDEN CORRECTO
+        # GENERAR CÓDIGO Y ÁMBITO (si no existen en la BD)
+        codigo = f"P{item_idx + 1}"  # Código basado en pregunta
+        ambito = "Seguridad de la Nación"  # Ámbito fijo
+        
+        # 13 COLUMNAS EN EL ORDEN CORRECTO
         valores = [[
-            nombre or "",
-            email or "",
-            grado or "",
-            cargo or "",
-            institucion or "",
-            perfil or "",
-            codigo or "",
-            ambito or "",
-            "Técnica-Cibernética",  # Dimensión fija por ahora
-            item_idx + 1,
-            f"Pregunta {item_idx + 1}",
-            transcripcion or "",
-            created_at.isoformat() if created_at else datetime.datetime.now().isoformat()
+            nombre or "",                # 1. Participante
+            email or "",                 # 2. Correo
+            grado or "",                 # 3. Grado
+            cargo or "",                 # 4. Cargo
+            institucion or "",           # 5. Institución
+            perfil or "",                # 6. Perfil
+            codigo,                      # 7. Código
+            ambito,                      # 8. Ámbito
+            "Técnica-Cibernética",       # 9. Dimensión
+            item_idx + 1,                # 10. Pregunta Index
+            f"Pregunta {item_idx + 1}",  # 11. Pregunta
+            transcripcion or "",         # 12. Respuesta
+            created_at.isoformat() if created_at else datetime.datetime.now().isoformat()  # 13. Fecha
         ]]
         
         service.spreadsheets().values().append(
