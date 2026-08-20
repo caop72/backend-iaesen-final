@@ -462,9 +462,13 @@ function iniciarReconocimiento() {
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
 
+        // MOSTRAR TEXTO EN EL CUADRO
         const mostrar = (state.transcripcionFinal || '') + (interim ? ' ' + interim : '');
         tb.value = mostrar.trim();
         tb.scrollTop = tb.scrollHeight;
+        
+        // GUARDAR EN STATE PARA QUE NO SE PIERDA
+        state.textoManual = tb.value;
     };
 
     state.recognition.onerror = (event) => {
@@ -472,23 +476,29 @@ function iniciarReconocimiento() {
         const mensajes = {
             'not-allowed': 'El navegador bloqueó el acceso al reconocimiento de voz.',
             'audio-capture': 'No se detectó un micrófono disponible.',
-            'no-speech': 'No se detectó voz.',
+            'no-speech': 'No se detectó voz. Intente hablar más cerca del micrófono.',
             'network': 'El servicio de reconocimiento no está disponible.',
             'language-not-supported': 'El idioma seleccionado no es compatible.'
         };
-        mostrarStatus(mensajes[event.error] || `Error desconocido: ${event.error}`, 'error');
+        mostrarStatus(mensajes[event.error] || `Error: ${event.error}`, 'error');
     };
 
     state.recognition.onend = () => {
         state.isRecognizing = false;
         console.log('Reconocimiento finalizado');
         const tb = document.getElementById('transcription-box');
-        if (tb) {
-            tb.value = (state.transcripcionFinal || '').trim();
+        if (tb && state.transcripcionFinal) {
+            tb.value = state.transcripcionFinal.trim();
+            state.textoManual = tb.value;
         }
     };
 
-    state.recognition.start();
+    try {
+        state.recognition.start();
+    } catch (e) {
+        console.warn('Error al iniciar reconocimiento:', e);
+        mostrarStatus('Error al iniciar el reconocimiento de voz. Intente de nuevo.', 'error');
+    }
 }
 
 function playResponse() {
@@ -518,16 +528,34 @@ async function confirmarEnvio() {
         mostrarStatus('Por favor detenga la grabación antes de confirmar.', 'error');
         return;
     }
-    const respuesta = document.getElementById('transcription-box').value.trim();
+    
+    // OBTENER EL TEXTO ACTUAL DEL CUADRO
+    const tb = document.getElementById('transcription-box');
+    let respuesta = tb.value.trim();
+    
+    // SI EL CUADRO ESTÁ VACÍO PERO HAY TRANSCRIPCIÓN EN MEMORIA, USARLA
+    if (!respuesta && state.transcripcionFinal) {
+        respuesta = state.transcripcionFinal.trim();
+        tb.value = respuesta; // Mostrarlo en el cuadro
+    }
+    
+    // SI NO HAY TEXTO PERO HAY AUDIO, USAR PLACEHOLDER
+    if (!respuesta && state.tieneAudio) {
+        respuesta = "[Respuesta de voz]";
+        tb.value = respuesta;
+    }
+    
     if (!respuesta && !state.tieneAudio) {
         mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
         return;
     }
+    
     const guardado = await guardarRespuesta(respuesta);
     if (!guardado) {
         mostrarStatus('No se pudo guardar la respuesta.', 'error');
         return;
     }
+    
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
     if (subIdx < 2) {
@@ -582,30 +610,75 @@ async function guardarRespuesta(respuesta) {
     const key = `${state.currentItemIdx}_${state.currentSubIdx}`;
     state.answers[key] = respuesta;
 
+    // VALIDAR QUE LA RESPUESTA NO ESTÉ VACÍA
+    let textoFinal = respuesta;
+    if (!textoFinal || textoFinal.trim() === '') {
+        console.warn('Respuesta vacía, usando placeholder');
+        textoFinal = "[Respuesta de voz]";
+    }
+
     const formData = new FormData();
     formData.append('sessionId', state.sessionId);
     formData.append('itemIdx', state.currentItemIdx);
     formData.append('subIdx', state.currentSubIdx);
-    formData.append('transcripcion', respuesta);
+    formData.append('transcripcion', textoFinal);
     formData.append('perfil', state.role);
+    
     if (state.audioChunks.length > 0) {
         const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
         formData.append('audio', blob, 'respuesta.webm');
     }
+    
     try {
-        const res = await fetch(`${API_BASE}/respuesta`, { method: 'POST', body: formData });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(`${API_BASE}/respuesta`, { 
+            method: 'POST', 
+            body: formData 
+        });
+        
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+        
+        const data = await res.json();
+        console.log('✅ Respuesta guardada:', data);
+        
+        // FORZAR SINCRONIZACIÓN INMEDIATA
+        await forzarSincronizacion();
+        
         state.audioChunks = [];
         return true;
     } catch (e) {
         console.error('Error al guardar la respuesta:', e);
+        mostrarStatus(`Error al guardar: ${e.message}`, 'error');
         return false;
+    }
+}
+
+async function forzarSincronizacion() {
+    try {
+        console.log('🔄 Forzando sincronización con Google Sheets...');
+        const res = await fetch(`${API_BASE}/admin/sincronizar`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        console.log('✅ Sincronización ejecutada:', data);
+        mostrarStatus('✅ Datos sincronizados con Google Sheets', 'success');
+        return data;
+    } catch (e) {
+        console.error('❌ Error en sincronización:', e);
+        mostrarStatus('⚠️ No se pudo sincronizar con Sheets, pero los datos están guardados', 'error');
+        return null;
     }
 }
 
 function mostrarStatus(msg, type) {
     const el = document.getElementById('status-msg');
-    if (!msg) { el.classList.add('hidden'); return; }
+    if (!msg) { 
+        el.classList.add('hidden'); 
+        el.textContent = '';
+        return; 
+    }
     el.textContent = msg;
     el.className = 'status-msg ' + (type || '');
     el.classList.remove('hidden');
