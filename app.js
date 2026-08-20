@@ -1,4 +1,4 @@
-// app.js - Versión final con reconocimiento de voz corregido
+// app.js - Versión final con reconocimiento de voz + Guardado Local + Envío Único Final
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -25,6 +25,10 @@ let state = {
     recordingTimer: null,
     audioEscuchadoEnPreguntaActual: false
 };
+
+// --- NUEVAS VARIABLES PARA GUARDADO LOCAL Y ENVÍO FINAL ---
+let respuestasLocales = [];       // Array donde se acumulan todas las respuestas antes del envío final
+let entrevistaFinalizada = false; // Control para evitar envíos duplicados
 
 function mostrarMenu() {
     document.getElementById('view-portada').classList.add('hidden');
@@ -108,11 +112,15 @@ async function iniciarEntrevistaExperto() {
 
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
+        
         state.sessionId = data.sessionId;
         state.items = data.items;
         state.currentItemIdx = 0;
         state.currentSubIdx = 0;
         state.answers = {};
+        respuestasLocales = [];          // Limpiar array local
+        entrevistaFinalizada = false;    // Reiniciar flag
+        
         showView('view-entrevista');
         cargarPregunta();
     } catch (e) {
@@ -133,11 +141,15 @@ async function iniciarEntrevistaNoExperto() {
 
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
+        
         state.sessionId = data.sessionId;
         state.items = data.items;
         state.currentItemIdx = 0;
         state.currentSubIdx = 0;
         state.answers = {};
+        respuestasLocales = [];          // Limpiar array local
+        entrevistaFinalizada = false;    // Reiniciar flag
+        
         showView('view-entrevista');
         cargarPregunta();
     } catch (e) {
@@ -560,6 +572,31 @@ function borrarRespuesta() {
     mostrarStatus('Respuesta borrada.', 'info');
 }
 
+// ============================================================
+// NUEVA LÓGICA DE GUARDADO LOCAL Y ENVÍO FINAL
+// ============================================================
+
+// Guarda la respuesta en la memoria local (y en el array de respuestas locales)
+function guardarRespuestaLocal(itemIdx, subIdx, transcripcion) {
+    // Agregar la respuesta al array local
+    respuestasLocales.push({
+        itemIdx: itemIdx,
+        subIdx: subIdx,
+        transcripcion: transcripcion
+    });
+    
+    // Guardar en LocalStorage para persistencia (si el usuario cierra la app)
+    localStorage.setItem('entrevista_' + state.sessionId, JSON.stringify(respuestasLocales));
+    
+    // Actualizar el estado de answers para la navegación fluida
+    const key = `${itemIdx}_${subIdx}`;
+    state.answers[key] = transcripcion;
+    
+    console.log(`✅ Respuesta ${itemIdx}_${subIdx} guardada localmente. Total local: ${respuestasLocales.length}`);
+    return true;
+}
+
+// Función que se ejecuta cuando el usuario presiona "Confirmar envío" (YA NO envía al servidor)
 async function confirmarEnvio() {
     if (state.isRecording) {
         mostrarStatus('Por favor detenga la grabación antes de confirmar.', 'error');
@@ -583,13 +620,20 @@ async function confirmarEnvio() {
         mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
         return;
     }
-    
-    const guardado = await guardarRespuesta(respuesta);
+
+    // --- CAMBIO CRUCIAL: Guardar en LOCAL en lugar de enviar al servidor ---
+    const guardado = guardarRespuestaLocal(state.currentItemIdx, state.currentSubIdx, respuesta);
     if (!guardado) {
-        mostrarStatus('No se pudo guardar la respuesta.', 'error');
+        mostrarStatus('Error al guardar la respuesta localmente.', 'error');
         return;
     }
     
+    // Limpiar chunks de audio después de guardar
+    state.audioChunks = [];
+    
+    mostrarStatus('✅ Respuesta guardada localmente. Puede continuar.', 'success');
+    
+    // Navegar a la siguiente pregunta
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
     if (subIdx < 2) {
@@ -598,15 +642,19 @@ async function confirmarEnvio() {
         state.currentItemIdx++;
         state.currentSubIdx = 0;
     } else {
-        mostrarStatus('🎉 Entrevista completada. ¡Gracias por participar!', 'success');
+        // Entrevista completada localmente
+        mostrarStatus('🎉 Entrevista completada. Revise sus respuestas y luego presione "Finalizar".', 'success');
         document.getElementById('btn-confirmar').disabled = true;
         document.getElementById('btn-siguiente').disabled = true;
+        // Habilitar el botón de finalizar si existe
+        const btnFinalizar = document.getElementById('btn-finalizar');
+        if (btnFinalizar) btnFinalizar.disabled = false;
         return;
     }
     cargarPregunta();
-    mostrarStatus('', '');
 }
 
+// Función para navegar entre preguntas (sin afectar el guardado local)
 async function navegar(direccion) {
     if (state.isRecording) {
         mostrarStatus('Por favor detenga la grabación antes de avanzar.', 'error');
@@ -640,69 +688,83 @@ async function navegar(direccion) {
     mostrarStatus('', '');
 }
 
-async function guardarRespuesta(respuesta) {
-    const key = `${state.currentItemIdx}_${state.currentSubIdx}`;
-    state.answers[key] = respuesta;
+// ============================================================
+// ENVIO ÚNICO FINAL A GOOGLE SHEETS
+// ============================================================
 
-    let textoFinal = respuesta;
-    if (!textoFinal || textoFinal.trim() === '') {
-        console.warn('Respuesta vacía, usando placeholder');
-        textoFinal = "[Respuesta de voz]";
+async function finalizarEntrevista() {
+    if (entrevistaFinalizada) {
+        mostrarStatus('La entrevista ya fue enviada.', 'error');
+        return;
     }
-
-    const formData = new FormData();
-    formData.append('sessionId', state.sessionId);
-    formData.append('itemIdx', state.currentItemIdx);
-    formData.append('subIdx', state.currentSubIdx);
-    formData.append('transcripcion', textoFinal);
-    formData.append('perfil', state.role);
     
-    if (state.audioChunks.length > 0) {
-        const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
-        formData.append('audio', blob, 'respuesta.webm');
+    if (respuestasLocales.length === 0) {
+        mostrarStatus('No hay respuestas guardadas para enviar.', 'error');
+        return;
+    }
+    
+    // Confirmación antes de enviar
+    if (!confirm(`¿Está seguro de que desea enviar las ${respuestasLocales.length} respuestas a Google Sheets?\n\nUna vez enviadas, no podrá modificarlas.`)) {
+        return;
+    }
+    
+    const btnFinalizar = document.getElementById('btn-finalizar');
+    if (btnFinalizar) {
+        btnFinalizar.disabled = true;
+        btnFinalizar.innerText = "⏳ Enviando a Google Sheets...";
     }
     
     try {
-        const res = await fetch(`${API_BASE}/respuesta`, { 
-            method: 'POST', 
-            body: formData 
+        // Construir el payload único con todas las respuestas
+        const datos = {
+            sessionId: state.sessionId,
+            respuestas: respuestasLocales
+        };
+        
+        console.log('📦 Enviando entrevista completa a Google Sheets...', datos);
+        
+        const response = await fetch(`${API_BASE}/entrevista-completa`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(datos)
         });
         
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`HTTP ${res.status}: ${errorText}`);
+        const result = await response.json();
+        
+        if (response.ok) {
+            entrevistaFinalizada = true;
+            mostrarStatus('🎉 Entrevista enviada con éxito a Google Sheets!', 'success');
+            console.log('✅ Resultado del envío:', result);
+            
+            // Limpiar LocalStorage
+            localStorage.removeItem('entrevista_' + state.sessionId);
+            respuestasLocales = [];
+            
+            // Redirigir a pantalla de agradecimiento o mostrar mensaje final
+            alert('✅ Entrevista completada y sincronizada correctamente.\n\n¡Gracias por su participación!');
+            
+        } else {
+            const errorMsg = result.detail || 'Error desconocido al enviar la entrevista.';
+            mostrarStatus(`❌ Error: ${errorMsg}`, 'error');
+            console.error('Error en el envío final:', result);
+            if (btnFinalizar) {
+                btnFinalizar.disabled = false;
+                btnFinalizar.innerText = "📤 Finalizar y enviar entrevista";
+            }
         }
-        
-        const data = await res.json();
-        console.log('✅ Respuesta guardada:', data);
-        
-        await forzarSincronizacion();
-        
-        state.audioChunks = [];
-        return true;
-    } catch (e) {
-        console.error('Error al guardar la respuesta:', e);
-        mostrarStatus(`Error al guardar: ${e.message}`, 'error');
-        return false;
+    } catch (error) {
+        mostrarStatus(`❌ Error de conexión: ${error.message}`, 'error');
+        console.error('Error de red al enviar la entrevista:', error);
+        if (btnFinalizar) {
+            btnFinalizar.disabled = false;
+            btnFinalizar.innerText = "📤 Finalizar y enviar entrevista";
+        }
     }
 }
 
-async function forzarSincronizacion() {
-    try {
-        console.log('🔄 Forzando sincronización con Google Sheets...');
-        const res = await fetch(`${API_BASE}/admin/sincronizar`, {
-            method: 'POST'
-        });
-        const data = await res.json();
-        console.log('✅ Sincronización ejecutada:', data);
-        mostrarStatus('✅ Datos sincronizados con Google Sheets', 'success');
-        return data;
-    } catch (e) {
-        console.error('❌ Error en sincronización:', e);
-        mostrarStatus('⚠️ No se pudo sincronizar con Sheets, pero los datos están guardados', 'error');
-        return null;
-    }
-}
+// ============================================================
+// FUNCIONES DE STATUS Y UTILIDADES
+// ============================================================
 
 function mostrarStatus(msg, type) {
     const el = document.getElementById('status-msg');
@@ -716,7 +778,15 @@ function mostrarStatus(msg, type) {
     el.classList.remove('hidden');
 }
 
+// Inicialización al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('view-portada').classList.remove('hidden');
     setupRecordButton();
+    
+    // Verificar si existe el botón de finalizar y asignarle el evento
+    const btnFinalizar = document.getElementById('btn-finalizar');
+    if (btnFinalizar) {
+        btnFinalizar.addEventListener('click', finalizarEntrevista);
+        btnFinalizar.disabled = true; // Se habilita solo al completar la última pregunta
+    }
 });

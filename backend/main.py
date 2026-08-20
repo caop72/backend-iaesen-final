@@ -5,15 +5,15 @@ import json
 import datetime
 import asyncio
 import logging
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import aiofiles
-from typing import Optional
+from typing import Optional, List
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-# Configuración de logging para ver errores en Render
+# Configuración de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("uvicorn.error")
 
@@ -32,7 +32,6 @@ app.add_middleware(
 )
 
 # ----------------- RUTAS DE ARCHIVOS Y BASE DE DATOS -----------------
-# RUTA ABSOLUTA PARA RENDER CON DISCO MONTADO
 AUDIO_BASE = "/opt/render/project/src/backend/audios"
 DB_PATH = "entrevistas.db"
 
@@ -99,11 +98,8 @@ def obtener_servicio_sheets():
     return build("sheets", "v4", credentials=credentials, cache_discovery=False)
 
 def procesar_sincronizacion_unitaria(respuesta_id: int):
-    """Función síncrona bloqueante para ejecutar dentro del worker"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
-    # Obtener datos de la respuesta
     c.execute('''SELECT s.nombre, s.email, s.grado, s.cargo, s.institucion, s.perfil,
                         r.item_idx, r.sub_idx, r.transcripcion, r.created_at
                  FROM respuestas r
@@ -117,14 +113,11 @@ def procesar_sincronizacion_unitaria(respuesta_id: int):
     
     nombre, email, grado, cargo, institucion, perfil, item_idx, sub_idx, transcripcion, created_at = row
     
-    # -----------------------------------------------------------------
-    # CORRECCIÓN: Buscar el nombre real del perfil en la matriz global
-    nombre_perfil = perfil  # Por defecto, si no lo encuentra, queda el código
+    nombre_perfil = perfil
     for key, val in matriz.items():
         if val["id"] == perfil:
             nombre_perfil = val["nombre"]
             break
-    # -----------------------------------------------------------------
     
     try:
         service = obtener_servicio_sheets()
@@ -141,7 +134,7 @@ def procesar_sincronizacion_unitaria(respuesta_id: int):
             grado or "",
             cargo or "",
             institucion or "",
-            nombre_perfil or "",  # <--- AHORA ENVÍA EL NOMBRE COMPLETO
+            nombre_perfil or "",
             codigo,
             ambito,
             "Técnica-Cibernética",
@@ -163,7 +156,28 @@ def procesar_sincronizacion_unitaria(respuesta_id: int):
     except Exception as e:
         return False, str(e)
 
-# ----------------- ENDPOINTS PÚBLICOS (RÁPIDOS) -----------------
+def subir_lote_a_sheets(pendientes_ids: List[int]):
+    resultados = {"procesados": 0, "exitosos": 0, "fallidos": 0}
+    for resp_id in pendientes_ids:
+        resultados["procesados"] += 1
+        exito, error = procesar_sincronizacion_unitaria(resp_id)
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        if exito:
+            c.execute('''UPDATE respuestas SET sync_status = 'sincronizado', sync_error = NULL, sync_attempts = 0, synced_at = ? WHERE id = ?''',
+                      (datetime.datetime.now().isoformat(), resp_id))
+            resultados["exitosos"] += 1
+        else:
+            c.execute('''UPDATE respuestas SET sync_status = 'error_reintentando', sync_error = ?, sync_attempts = sync_attempts + 1 WHERE id = ?''',
+                      (error, resp_id))
+            resultados["fallidos"] += 1
+            logger.error(f"Fallo sincronización ID {resp_id}: {error}")
+        conn.commit()
+        conn.close()
+    return resultados
+
+# ----------------- ENDPOINTS PÚBLICOS -----------------
 
 @app.get("/")
 async def root():
@@ -260,100 +274,42 @@ async def get_pregunta(numero: int, lang: str = "es-VE"):
     }
     return JSONResponse({"texto": textos.get(lang, textos["es-VE"])})
 
-@app.post("/api/respuesta")
-async def guardar_respuesta(
-    sessionId: str = Form(...),
-    itemIdx: int = Form(...),
-    subIdx: int = Form(...),
-    transcripcion: str = Form(default=""),
-    perfil: str = Form(...),
-    audio: Optional[UploadFile] = File(None)
-):
-    if not transcripcion.strip() and audio is None:
-        raise HTTPException(422, "Debe proporcionar transcripción o audio")
-    
-    if not transcripcion.strip():
-        transcripcion = "[Respuesta de voz]"
-    
-    audio_path = None
-    if audio:
-        audio_path = os.path.join(AUDIO_RESPUESTAS_DIR, f"{sessionId}_{itemIdx}_{subIdx}_audio.webm")
-        async with aiofiles.open(audio_path, 'wb') as f:
-            await f.write(await audio.read())
-
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''INSERT INTO respuestas 
-                 (sesion_id, item_idx, sub_idx, audio_path, transcripcion, lang, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)''',
-              (sessionId, itemIdx, subIdx, audio_path, transcripcion, "es-VE", datetime.datetime.now()))
-    respuesta_id = c.lastrowid
-    conn.commit()
-    conn.close()
-
-    # RESPUESTA INMEDIATA. NADA DE SINCRONIZACIÓN AQUÍ.
-    return JSONResponse({
-        "status": "saved",
-        "respuesta_id": respuesta_id,
-        "sync_status": "pendiente"
-    })
-
-@app.get("/api/admin/dashboard")
-async def dashboard():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM respuestas")
-    total_respuestas = c.fetchone()[0]
-    c.execute("SELECT COUNT(DISTINCT sesion_id) FROM respuestas")
-    total_sesiones = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM respuestas WHERE sync_status = 'pendiente' OR sync_status = 'error_reintentando'")
-    videos_pendientes = c.fetchone()[0]
-    conn.close()
-    return JSONResponse({
-        "totalRespuestas": total_respuestas,
-        "totalSesiones": total_sesiones,
-        "videosPendientes": videos_pendientes
-    })
-
-# ----------------- ENDPOINT DE SINCRONIZACIÓN POR LOTE (Cron) -----------------
-# AHORA SIN CLAVE INVENTADA, SOLO USA GOOGLE_CREDENTIALS_JSON
-@app.post("/api/admin/procesar-pendientes")
-async def procesar_pendientes():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    
-    c.execute('''SELECT id FROM respuestas 
-                 WHERE sync_status = 'pendiente' OR sync_status = 'error_reintentando'
-                 ORDER BY created_at ASC LIMIT 10''') # Lote pequeño para evitar timeouts
-    pendientes = [row[0] for row in c.fetchall()]
-    conn.close()
-    
-    resultados = {"procesados": 0, "exitosos": 0, "fallidos": 0}
-    
-    for resp_id in pendientes:
-        resultados["procesados"] += 1
-        exito, error = procesar_sincronizacion_unitaria(resp_id)
+# ----------------- NUEVO ENDPOINT (ENVÍO ÚNICO FINAL) -----------------
+@app.post("/api/entrevista-completa")
+async def recibir_entrevista_completa(datos: dict):
+    try:
+        session_id = datos.get("sessionId")
+        respuestas = datos.get("respuestas", [])
         
+        if not session_id or not respuestas:
+            raise HTTPException(400, "Datos incompletos")
+        
+        # Guardar todas las respuestas en SQLite
+        ids_guardados = []
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        if exito:
-            c.execute('''UPDATE respuestas SET sync_status = 'sincronizado', sync_error = NULL, sync_attempts = 0, synced_at = ? WHERE id = ?''',
-                      (datetime.datetime.now().isoformat(), resp_id))
-            resultados["exitosos"] += 1
-        else:
-            c.execute('''UPDATE respuestas SET sync_status = 'error_reintentando', sync_error = ?, sync_attempts = sync_attempts + 1 WHERE id = ?''',
-                      (error, resp_id))
-            resultados["fallidos"] += 1
-            logger.error(f"Fallo sincronización ID {resp_id}: {error}")
+        for r in respuestas:
+            c.execute('''INSERT INTO respuestas 
+                         (sesion_id, item_idx, sub_idx, transcripcion, lang, sync_status, created_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                      (session_id, r["itemIdx"], r["subIdx"], r["transcripcion"] or "[Respuesta de voz]", "es-VE", "pendiente", datetime.datetime.now()))
+            ids_guardados.append(c.lastrowid)
         conn.commit()
         conn.close()
-    
-    return JSONResponse({
-        "ok": True,
-        "resumen": resultados,
-        "mensaje": f"Procesados: {resultados['procesados']}. Exitosos: {resultados['exitosos']}. Fallidos: {resultados['fallidos']}."
-    })
 
+        # Subir inmediatamente el lote a Google Sheets
+        resultados = subir_lote_a_sheets(ids_guardados)
+        
+        return JSONResponse({
+            "status": "Entrevista completada",
+            "total_enviadas": len(ids_guardados),
+            "resultado_sheets": resultados
+        })
+    except Exception as e:
+        logger.error(f"Error en entrevista completa: {e}")
+        raise HTTPException(500, f"Error interno: {str(e)}")
+
+# ----------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

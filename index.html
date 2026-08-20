@@ -93,9 +93,11 @@
         .status-msg.success { background: var(--success-light); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); }
         .status-msg.error { background: var(--danger-light); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent); }
         .status-msg.info { background: var(--accent-light); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); }
+        
+        /* NUEVO DISEÑO DE LA BARRA DE NAVEGACIÓN INFERIOR */
         .footer-navigation {
             display: grid;
-            grid-template-columns: auto 1fr 1fr auto;
+            grid-template-columns: auto 1fr 1fr 1fr auto;
             gap: 8px;
             align-items: center;
             margin-top: 16px;
@@ -103,27 +105,34 @@
         .nav-arrow { background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer; padding: 0 8px; transition: transform 0.1s; }
         .nav-arrow:hover { transform: scale(1.1); }
         .nav-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-submit { background: var(--accent); color: #fff; border: none; border-radius: var(--radius-md); padding: 12px 20px; font-size: 15px; font-weight: 600; cursor: pointer; flex-grow: 1; text-align: center; transition: opacity 0.2s; }
+        .btn-submit { background: var(--accent); color: #fff; border: none; border-radius: var(--radius-md); padding: 12px 10px; font-size: 14px; font-weight: 600; cursor: pointer; flex-grow: 1; text-align: center; transition: opacity 0.2s; }
         .btn-submit:hover { opacity: 0.9; }
         .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
-        .btn-clear { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        
+        /* NUEVO BOTÓN DE FINALIZAR */
+        .btn-finalizar {
+            background: var(--success);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-md);
+            padding: 12px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-grow: 1;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+        .btn-finalizar:hover { opacity: 0.9; }
+        .btn-finalizar:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .btn-clear { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 12px 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .btn-clear:hover { background: var(--danger-light); }
         .btn-clear:disabled { opacity: 0.35; cursor: not-allowed; }
         .home-link { display: block; text-align: center; margin-top: 12px; color: var(--text-tertiary); font-size: 13px; text-decoration: none; }
         .home-link:hover { color: var(--text-secondary); }
-        .progress-track {
-            height: 4px;
-            background: var(--border);
-            border-radius: 2px;
-            margin-bottom: 16px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            background: var(--accent);
-            border-radius: 2px;
-            transition: width 0.5s ease;
-        }
+        .progress-track { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s ease; }
         .status-indicator { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-strong); transition: all 0.3s ease; flex-shrink: 0; margin-left: 8px; }
         .status-indicator.locked { background: var(--danger-light); border-color: var(--danger); }
         .status-indicator.listening { background: var(--accent-light); border-color: var(--accent); }
@@ -274,11 +283,13 @@
                     </button>
                 </div>
 
-                <!-- BARRA DE NAVEGACIÓN INFERIOR -->
+                <!-- BARRA DE NAVEGACIÓN INFERIOR (ACTUALIZADA CON EL BOTÓN FINALIZAR) -->
                 <div class="footer-navigation">
                     <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
                     <button class="btn-clear" id="btn-clear" onclick="borrarRespuesta()">🗑️ Borrar</button>
-                    <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar envío</button>
+                    <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar</button>
+                    <!-- NUEVO BOTÓN DE FINALIZAR (Se habilita al terminar todas las preguntas) -->
+                    <button class="btn-finalizar" id="btn-finalizar" onclick="finalizarEntrevista()" disabled>📤 Finalizar</button>
                     <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
                 </div>
 
