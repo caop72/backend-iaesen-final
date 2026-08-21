@@ -1,4 +1,4 @@
-// app.js - FINAL COMPLETO: Estrellitas, texto en vivo, no bloqueo de confirmación
+// app.js - Dictado en vivo real, estrellitas, envío y navegación
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -52,7 +52,7 @@ function selectRole(role) {
         cargarPerfiles();
         showView('view-experto');
     } else if (role === 'no_experto') {
-        iniciarEntrevistaNoExperto(); // <--- AHORA INICIA DIRECTAMENTE (sin pantalla intermedia)
+        iniciarEntrevistaNoExperto(); // Inicia directamente
     }
 }
 
@@ -114,7 +114,7 @@ async function iniciarEntrevistaExperto() {
 
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
-        
+
         state.sessionId = data.sessionId;
         state.items = data.items;
         state.currentItemIdx = 0;
@@ -122,7 +122,7 @@ async function iniciarEntrevistaExperto() {
         state.answers = {};
         respuestasLocales = [];
         entrevistaFinalizada = false;
-        
+
         showView('view-entrevista');
         generarEstrellas();
         cargarPregunta();
@@ -144,7 +144,7 @@ async function iniciarEntrevistaNoExperto() {
 
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
-        
+
         state.sessionId = data.sessionId;
         state.items = data.items;
         state.currentItemIdx = 0;
@@ -152,7 +152,7 @@ async function iniciarEntrevistaNoExperto() {
         state.answers = {};
         respuestasLocales = [];
         entrevistaFinalizada = false;
-        
+
         showView('view-entrevista');
         generarEstrellas();
         cargarPregunta();
@@ -167,15 +167,13 @@ function generarEstrellas() {
     const container = document.getElementById('progress-stars');
     container.innerHTML = '';
     const totalPreguntas = state.items.length * 3;
-    
-    // Muestra el total de preguntas
+
     const label = document.createElement('span');
     label.className = 'total-stars-label';
     label.textContent = `Preguntas: ${totalPreguntas}`;
     label.id = 'total-stars-label';
     container.appendChild(label);
-    
-    // Crear las estrellas
+
     for (let i = 0; i < totalPreguntas; i++) {
         const star = document.createElement('div');
         star.className = 'star';
@@ -188,22 +186,17 @@ function generarEstrellas() {
 // Función para updatear el estado de las estrellas basado en el estado del sistema
 function actualizarEstrellas() {
     const totalPreguntas = state.items.length * 3;
-    
-    // Índices de preguntas que ya están respondidas (en el estado local)
     const answeredKeys = Object.keys(state.answers);
-    
+
     for (let i = 0; i < totalPreguntas; i++) {
         const star = document.getElementById(`star-${i}`);
         if (!star) return;
-        
-        // Transformar índice a clave de respuesta (ej: 0_0, 0_1, 0_2, 1_0...)
+
         const itemIdx = Math.floor(i / 3);
         const subIdx = i % 3;
         const key = `${itemIdx}_${subIdx}`;
-        
-        // Si está respondida
+
         if (answeredKeys.includes(key)) {
-            // Si está respondida, pero no sincronizada (puede llevar un icono)
             if (lastSyncError) {
                 star.classList.add('pending');
                 star.classList.remove('active');
@@ -218,17 +211,17 @@ function actualizarEstrellas() {
     }
 }
 
-// Función para updatear el estado de las estrellas con WhatsApp (para el envío)
+// Función para updatear el estado de las estrellas sincronizadas
 function actualizarEstrellasSincronizadas(sincronizadas) {
     const totalPreguntas = state.items.length * 3;
     for (let i = 0; i < totalPreguntas; i++) {
         const star = document.getElementById(`star-${i}`);
         if (!star) return;
-        
+
         const itemIdx = Math.floor(i / 3);
         const subIdx = i % 3;
         const key = `${itemIdx}_${subIdx}`;
-        
+
         if (sincronizadas.includes(key)) {
             star.classList.add('active');
             star.classList.remove('pending');
@@ -301,7 +294,7 @@ async function cargarPregunta() {
         state.transcripcionFinal = respuestaGuardada;
         state.textoManual = respuestaGuardada;
     }
-    
+
     state.tieneAudio = false;
     state.isRecognizing = false;
     state.isRecording = false;
@@ -386,25 +379,12 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         mostrarStatus('No se pudo cargar el audio. Puede leer la pregunta y responder igualmente.', 'error');
     };
 
-    actualizarHexagono();
     mostrarStatus('', '');
-}
-
-function actualizarHexagono() {
-    const hexLabel = document.getElementById('hex-label-text');
-    const itemNum = state.currentItemIdx + 1;
-    const subNum = state.currentSubIdx + 1;
-    const sufijos = ['RA', 'DA', 'RA'];
-    hexLabel.textContent = `${subNum}${sufijos[subNum-1]} PREGUNTA`;
-    for (let i = 1; i <= 6; i++) {
-        const side = document.getElementById(`side-${i}`);
-        side.classList.toggle('active', i === itemNum);
-    }
 }
 
 function setupRecordButton() {
     const btn = document.getElementById('btn-record');
-    
+
     btn.addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (state.isRecording || state.touchStarted) return;
@@ -453,7 +433,6 @@ function setupRecordButton() {
 
 async function startRecording() {
     try {
-        // 1. Detener el reconocimiento anterior si existe
         if (state.recognition && state.isRecognizing) {
             state.recognition.abort();
             state.recognition = null;
@@ -477,7 +456,6 @@ async function startRecording() {
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('🎤 Grabando y escuchando...', 'success');
 
-        // 2. Iniciar reconocimiento con configuración óptima
         iniciarReconocimiento();
 
         if (state.recordingTimer) clearInterval(state.recordingTimer);
@@ -498,7 +476,6 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
-            // 3. IMPORTANTE: Abortar reconocimiento para consolidar el texto exacto
             if (state.recognition && state.isRecognizing) {
                 state.recognition.abort();
                 state.isRecognizing = false;
@@ -529,20 +506,15 @@ function stopRecording() {
         state.stream = null;
     }
 
-    // CONSOLIDAR TEXTO FINAL DESPUÉS DE DETENER
     setTimeout(() => {
         const tb = document.getElementById('transcription-box');
         if (tb && state.transcripcionFinal) {
-            // Limpiar texto repetido e incompleto
             let textoFinal = state.transcripcionFinal.trim();
-            // Borrar duplicados consecutivos si existen
             textoFinal = textoFinal.replace(/(\b\w+\b)(?:\s+\1)+/g, '$1');
             tb.value = textoFinal;
             state.textoManual = textoFinal;
             state.transcripcionFinal = textoFinal;
         }
-        
-        // 💡 AGREGAR ESTA LÍNEA: Inmediatamente habilitar el botón "Confirmar"
         document.getElementById('btn-confirmar').disabled = false;
     }, 100);
 }
@@ -573,43 +545,43 @@ function iniciarReconocimiento() {
     };
 
     state.recognition.onresult = (event) => {
-        // SOLO acumular texto final (no interim)
         let finalText = '';
+        let interimText = '';
+
         for (let i = 0; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalText += event.results[i][0].transcript + ' ';
+                finalText += transcript + ' ';
+            } else {
+                interimText += transcript + ' ';
             }
         }
+
         if (finalText.trim()) {
             state.transcripcionFinal += finalText;
         }
 
-        // Solo mostrar interim en el cuadro de forma TEMPORAL
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
-        let interim = '';
-        for (let i = 0; i < event.results.length; i++) {
-            if (!event.results[i].isFinal) {
-                interim += event.results[i][0].transcript;
-            }
-        }
-        tb.value = (state.transcripcionFinal || '') + (interim ? ' ' + interim : '');
+
+        // 👇 DICTADO EN VIVO: Mostrar texto final + intermedio
+        tb.value = (state.transcripcionFinal || '') + (interimText ? ' ' + interimText : '');
         tb.scrollTop = tb.scrollHeight;
     };
 
     state.recognition.onerror = (event) => {
         console.error('❌ SpeechRecognition error:', event.error);
-        
+
         if (event.error === 'no-speech') {
             console.log('🔇 No se detectó voz, continúa escuchando...');
             return;
         }
-        
+
         if (event.error === 'aborted') {
             console.log('Reconocimiento detenido por el usuario');
             return;
         }
-        
+
         const mensajes = {
             'not-allowed': '❌ Permiso de micrófono denegado.',
             'audio-capture': '❌ No se detectó un micrófono.',
@@ -670,11 +642,11 @@ function guardarRespuestaLocal(itemIdx, subIdx, transcripcion) {
         subIdx: subIdx,
         transcripcion: transcripcion
     });
-    
+
     localStorage.setItem('entrevista_' + state.sessionId, JSON.stringify(respuestasLocales));
     const key = `${itemIdx}_${subIdx}`;
     state.answers[key] = transcripcion;
-    
+
     console.log(`✅ Respuesta ${itemIdx}_${subIdx} guardada localmente. Total local: ${respuestasLocales.length}`);
     return true;
 }
@@ -685,22 +657,22 @@ async function confirmarEnvio() {
         mostrarStatus('Por favor detenga la grabación antes de confirmar.', 'error');
         return;
     }
-    
+
     const tb = document.getElementById('transcription-box');
     let respuesta = tb.value.trim();
-    
+
     if (!respuesta && state.transcripcionFinal) {
         respuesta = state.transcripcionFinal.trim();
         tb.value = respuesta;
     }
-    
+
     if (!respuesta && state.tieneAudio) {
-    mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
-    return;
-}
-    
+        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
+        return;
+    }
+
     if (!respuesta && !state.tieneAudio) {
-        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escriba su respuesta.', 'error');
+        mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
         return;
     }
 
@@ -709,14 +681,14 @@ async function confirmarEnvio() {
         mostrarStatus('Error al guardar la respuesta localmente.', 'error');
         return;
     }
-    
+
     state.audioChunks = [];
     mostrarStatus('✅ Respuesta guardada localmente.', 'success');
-    
+
     // --- ENVÍO INDIVIDUAL POR PREGUNTA ---
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
-    
+
     // Enviar solo esta respuesta
     fetch(`${API_BASE}/entrevista-completa`, {
         method: 'POST',
@@ -750,7 +722,7 @@ async function confirmarEnvio() {
         mostrarStatus('⏳ Sincronizando última respuesta...', 'info');
         document.getElementById('btn-confirmar').disabled = true;
         document.getElementById('btn-siguiente').disabled = true;
-        
+
         setTimeout(() => {
             enviarRespaldoFinal();
             mostrarStatus('🎉 Entrevista completada. Datos sincronizados.', 'success');
@@ -817,10 +789,10 @@ async function navegar(direccion) {
 // Funciones de estado
 function mostrarStatus(msg, type) {
     const el = document.getElementById('status-msg');
-    if (!msg) { 
-        el.classList.add('hidden'); 
+    if (!msg) {
+        el.classList.add('hidden');
         el.textContent = '';
-        return; 
+        return;
     }
     el.textContent = msg;
     el.className = 'status-msg ' + (type || '');
