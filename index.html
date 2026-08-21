@@ -87,7 +87,7 @@
                     <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
                 </div>
 
-                <!-- CABECERA: Pregunta + Indicador de estado -->
+                <!-- CABECERA: Pregunta + Indicador de estado + LOGO -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px;">
                     <div style="flex-grow: 1;">
                         <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
@@ -98,16 +98,8 @@
                             Por favor escuche el contexto y responda la pregunta.
                         </div>
                     </div>
-                    <div class="hex-wrapper">
-                        <svg class="hex-icon" viewBox="0 0 100 100">
-                            <line id="side-1" class="hex-side active" x1="50" y1="10" x2="85" y2="30" />
-                            <line id="side-2" class="hex-side" x1="85" y1="30" x2="85" y2="70" />
-                            <line id="side-3" class="hex-side" x1="85" y1="70" x2="50" y2="90" />
-                            <line id="side-4" class="hex-side" x1="50" y1="90" x2="15" y2="70" />
-                            <line id="side-5" class="hex-side" x1="15" y1="70" x2="15" y2="30" />
-                            <line id="side-6" class="hex-side" x1="15" y1="30" x2="50" y2="10" />
-                        </svg>
-                        <div class="hex-label" id="hex-label-text">1RA PREGUNTA</div>
+                    <div style="text-align: center;">
+                        <img src="logo-iaesen.png" alt="Logo IAESEN" style="max-width: 80px; height: auto;">
                     </div>
                 </div>
 
@@ -141,7 +133,7 @@
                             <div class="vu-bar" style="height: 8px;"></div>
                         </div>
                     </button>
-                    <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" disabled>
+                    <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" style="display: none;" disabled>
                         ▶️ Reproducir mi respuesta
                     </button>
                 </div>

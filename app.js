@@ -1,4 +1,4 @@
-// app.js - Versión final con estrellitas inteligentes y flujo simplificado
+// app.js - FINAL: Texto en vivo, sin placeholder y sin botón de reproducción
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -124,7 +124,7 @@ async function iniciarEntrevistaExperto() {
         entrevistaFinalizada = false;
         
         showView('view-entrevista');
-        generarEstrellas(); // <--- AGREGADO
+        generarEstrellas();
         cargarPregunta();
     } catch (e) {
         console.error('Error:', e);
@@ -154,7 +154,7 @@ async function iniciarEntrevistaNoExperto() {
         entrevistaFinalizada = false;
         
         showView('view-entrevista');
-        generarEstrellas(); // <--- AGREGADO
+        generarEstrellas();
         cargarPregunta();
     } catch (e) {
         console.error('Error:', e);
@@ -373,7 +373,6 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         actualizarEstadoIndicador();
         state.isPlaying = false;
         document.getElementById('btn-record').disabled = false;
-        document.getElementById('btn-play-response').disabled = false;
         document.getElementById('btn-confirmar').disabled = false;
         mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
     };
@@ -453,6 +452,12 @@ function setupRecordButton() {
 
 async function startRecording() {
     try {
+        // 1. Detener el reconocimiento anterior si existe
+        if (state.recognition && state.isRecognizing) {
+            state.recognition.abort();
+            state.recognition = null;
+        }
+
         const constraints = { audio: true };
         state.stream = await navigator.mediaDevices.getUserMedia(constraints);
         state.mediaRecorder = new MediaRecorder(state.stream);
@@ -471,6 +476,7 @@ async function startRecording() {
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('🎤 Grabando y escuchando...', 'success');
 
+        // 2. Iniciar reconocimiento con configuración óptima
         iniciarReconocimiento();
 
         if (state.recordingTimer) clearInterval(state.recordingTimer);
@@ -491,10 +497,10 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
+            // 3. IMPORTANTE: Abortar reconocimiento para consolidar el texto exacto
             if (state.recognition && state.isRecognizing) {
-                try {
-                    state.recognition.stop();
-                } catch (e) {}
+                state.recognition.abort();
+                state.isRecognizing = false;
             }
         };
     } catch (e) {
@@ -521,6 +527,20 @@ function stopRecording() {
         state.stream.getTracks().forEach(track => track.stop());
         state.stream = null;
     }
+
+    // CONSOLIDAR TEXTO FINAL DESPUÉS DE DETENER
+    setTimeout(() => {
+        const tb = document.getElementById('transcription-box');
+        if (tb && state.transcripcionFinal) {
+            // Limpiar texto repetido e incompleto
+            let textoFinal = state.transcripcionFinal.trim();
+            // Borrar duplicados consecutivos si existen
+            textoFinal = textoFinal.replace(/(\b\w+\b)(?:\s+\1)+/g, '$1');
+            tb.value = textoFinal;
+            state.textoManual = textoFinal;
+            state.transcripcionFinal = textoFinal;
+        }
+    }, 100);
 }
 
 function iniciarReconocimiento() {
@@ -549,30 +569,28 @@ function iniciarReconocimiento() {
     };
 
     state.recognition.onresult = (event) => {
-        let interim = '';
+        // SOLO acumular texto final (no interim)
         let finalText = '';
-
         for (let i = 0; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalText += transcript + ' ';
-                console.log('✅ Texto final:', finalText);
-            } else {
-                interim += transcript;
+                finalText += event.results[i][0].transcript + ' ';
             }
         }
-
         if (finalText.trim()) {
             state.transcripcionFinal += finalText;
         }
 
+        // Solo mostrar interim en el cuadro de forma TEMPORAL
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
-
-        const mostrar = (state.transcripcionFinal || '') + (interim ? ' ' + interim : '');
-        tb.value = mostrar.trim();
+        let interim = '';
+        for (let i = 0; i < event.results.length; i++) {
+            if (!event.results[i].isFinal) {
+                interim += event.results[i][0].transcript;
+            }
+        }
+        tb.value = (state.transcripcionFinal || '') + (interim ? ' ' + interim : '');
         tb.scrollTop = tb.scrollHeight;
-        state.textoManual = tb.value;
     };
 
     state.recognition.onerror = (event) => {
@@ -604,15 +622,6 @@ function iniciarReconocimiento() {
         if (tb && state.transcripcionFinal) {
             tb.value = state.transcripcionFinal.trim();
             state.textoManual = tb.value;
-        }
-        
-        if (state.isRecording) {
-            console.log('🔄 Reiniciando reconocimiento mientras graba...');
-            try {
-                state.recognition.start();
-            } catch (e) {
-                console.warn('No se pudo reiniciar el reconocimiento:', e);
-            }
         }
     };
 
@@ -681,13 +690,13 @@ async function confirmarEnvio() {
         tb.value = respuesta;
     }
     
-    if (!respuesta && state.tieneAudio) {
-        respuesta = "[Respuesta de voz]";
-        tb.value = respuesta;
+    if (!respuesta) {
+        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escriba su respuesta.', 'error');
+        return;
     }
     
     if (!respuesta && !state.tieneAudio) {
-        mostrarStatus('Debe escribir或 grabar una respuesta antes de confirmar.', 'error');
+        mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
         return;
     }
 
