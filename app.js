@@ -1,4 +1,4 @@
-// app.js - Versión final con corrección de último bloque
+// app.js - Versión final: envío individual por pregunta en segundo plano
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -29,7 +29,6 @@ let state = {
 // --- VARIABLES PARA GUARDADO LOCAL ---
 let respuestasLocales = [];
 let entrevistaFinalizada = false;
-let reintentosPendientes = 0;
 
 function mostrarMenu() {
     document.getElementById('view-portada').classList.add('hidden');
@@ -567,7 +566,7 @@ function borrarRespuesta() {
 }
 
 // -------------------------------------------------------------------
-// LÓGICA DE GUARDADO LOCAL Y ENVÍO EN SEGUNDO PLANO CON REINTENTOS
+// LÓGICA DE GUARDADO LOCAL + ENVÍO INDIVIDUAL POR PREGUNTA
 // -------------------------------------------------------------------
 
 // Guarda la respuesta en la memoria local
@@ -620,32 +619,27 @@ async function confirmarEnvio() {
     state.audioChunks = [];
     mostrarStatus('✅ Respuesta guardada localmente.', 'success');
     
-    // --- ENVÍO EN SEGUNDO PLANO AL FINAL DEL BLOQUE (subIdx === 2) ---
+    // --- NUEVO: ENVÍO INDIVIDUAL POR PREGUNTA EN SEGUNDO PLANO ---
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
-
-    if (subIdx === 2) {  // Es la tercera y última pregunta del Ítem
-        // Filtrar solo las 3 respuestas de este ítem
-        const respuestasDelItem = respuestasLocales.filter(r => r.itemIdx === itemIdx);
-        
-        // Enviar en segundo plano (Fire and Forget)
-        fetch(`${API_BASE}/entrevista-completa`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sessionId: state.sessionId,
-                respuestas: respuestasDelItem
-            })
-        }).then(response => {
-            if (response.ok) {
-                console.log(`✅ Bloque del ítem ${itemIdx} enviado a Sheets en 2º plano.`);
-            } else {
-                console.warn(`⚠️ El bloque del ítem ${itemIdx} no se envió correctamente. Se reintentará al final.`);
-            }
-        }).catch(err => {
-            console.warn(`⚠️ Error de red al enviar bloque ${itemIdx}. Se reintentará al final.`, err);
-        });
-    }
+    
+    // Enviar solo esta respuesta a Google Sheets (Fire and Forget)
+    fetch(`${API_BASE}/entrevista-completa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: state.sessionId,
+            respuestas: [{ itemIdx, subIdx, transcripcion: respuesta }]
+        })
+    }).then(response => {
+        if (response.ok) {
+            console.log(`✅ Respuesta ${itemIdx}_${subIdx} enviada a Sheets en 2º plano.`);
+        } else {
+            console.warn(`⚠️ La respuesta ${itemIdx}_${subIdx} no se envió. Se reintentará al final.`);
+        }
+    }).catch(err => {
+        console.warn(`⚠️ Error de red al enviar respuesta ${itemIdx}_${subIdx}. Se reintentará al final.`, err);
+    });
     // ------------------------------------------------------------------
 
     // Navegar a la siguiente pregunta
@@ -655,14 +649,12 @@ async function confirmarEnvio() {
         state.currentItemIdx++;
         state.currentSubIdx = 0;
     } else {
-        // Entrevista completada - Damos tiempo para que el último fetch termine
+        // Entrevista completada
         mostrarStatus('⏳ Sincronizando última respuesta...', 'info');
         document.getElementById('btn-confirmar').disabled = true;
         document.getElementById('btn-siguiente').disabled = true;
         
-        // Pequeña pausa para asegurar que el envío del bloque viaje
         setTimeout(() => {
-            // Envío de respaldo final (por si algún bloque falló)
             enviarRespaldoFinal();
             mostrarStatus('🎉 Entrevista completada. Datos sincronizados.', 'success');
         }, 500);
@@ -671,10 +663,8 @@ async function confirmarEnvio() {
     cargarPregunta();
 }
 
-// Envío de respaldo final al completar toda la entrevista
+// Envío de respaldo final (por si alguna pregunta individual falló)
 async function enviarRespaldoFinal() {
-    // Verificar si todas las respuestas locales ya están sincronizadas
-    // (Esta función se ejecuta solo para garantizar que no queden datos sin enviar)
     try {
         const respuestasPendientes = respuestasLocales.filter(r => !r._sincronizado);
         if (respuestasPendientes.length > 0) {
