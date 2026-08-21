@@ -1,4 +1,4 @@
-// app.js - FINAL: Audio, Texto, Envío, Navegación, Estrellitas y Botones Flotantes
+// app.js - FINAL DEFINITIVO: Audio, texto, envío, navegación, estrellitas y botones flotantes
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
