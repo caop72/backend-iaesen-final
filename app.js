@@ -1,4 +1,4 @@
-// app.js - Versión final: envío individual por pregunta en segundo plano
+// app.js - Versión final con estrellitas inteligentes y flujo simplificado
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -29,6 +29,8 @@ let state = {
 // --- VARIABLES PARA GUARDADO LOCAL ---
 let respuestasLocales = [];
 let entrevistaFinalizada = false;
+let lastSyncError = false;
+let pendingRetry = null;
 
 function mostrarMenu() {
     document.getElementById('view-portada').classList.add('hidden');
@@ -46,11 +48,11 @@ function goHome() {
 
 function selectRole(role) {
     state.role = role;
-    if (role === 'no_experto') {
-        showView('view-no-experto');
-    } else if (role === 'experto') {
+    if (role === 'experto') {
         cargarPerfiles();
         showView('view-experto');
+    } else if (role === 'no_experto') {
+        iniciarEntrevistaNoExperto(); // Se inicia inmediatamente, sin pantalla intermedia
     }
 }
 
@@ -122,6 +124,8 @@ async function iniciarEntrevistaExperto() {
         entrevistaFinalizada = false;
         
         showView('view-entrevista');
+        // Generar las estrellitas de progreso
+        generarEstrellas();
         cargarPregunta();
     } catch (e) {
         console.error('Error:', e);
@@ -151,10 +155,89 @@ async function iniciarEntrevistaNoExperto() {
         entrevistaFinalizada = false;
         
         showView('view-entrevista');
+        // Generar las estrellitas de progreso
+        generarEstrellas();
         cargarPregunta();
     } catch (e) {
         console.error('Error:', e);
         mostrarStatus('Error al iniciar la entrevista.', 'error');
+    }
+}
+
+// Función para generar las estrellitas de progreso
+function generarEstrellas() {
+    const container = document.getElementById('progress-stars');
+    container.innerHTML = '';
+    const totalPreguntas = state.items.length * 3;
+    
+    // Muestra el total de preguntas
+    const label = document.createElement('span');
+    label.className = 'total-stars-label';
+    label.textContent = `Preguntas: ${totalPreguntas}`;
+    label.id = 'total-stars-label';
+    container.appendChild(label);
+    
+    // Crear las estrellas
+    for (let i = 0; i < totalPreguntas; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.id = `star-${i}`;
+        star.title = `Pregunta ${i + 1}`;
+        container.appendChild(star);
+    }
+}
+
+// Función para updatear el estado de las estrellas basado en el estado del sistema
+function actualizarEstrellas() {
+    const totalPreguntas = state.items.length * 3;
+    
+    // Índices de preguntas que ya están respondidas (en el estado local)
+    const answeredKeys = Object.keys(state.answers);
+    
+    for (let i = 0; i < totalPreguntas; i++) {
+        const star = document.getElementById(`star-${i}`);
+        if (!star) return;
+        
+        // Transformar índice a clave de respuesta (ej: 0_0, 0_1, 0_2, 1_0...)
+        const itemIdx = Math.floor(i / 3);
+        const subIdx = i % 3;
+        const key = `${itemIdx}_${subIdx}`;
+        
+        // Si está respondida
+        if (answeredKeys.includes(key)) {
+            // Si está respondida, pero no sincronizada (puede llevar un icono)
+            if (lastSyncError) {
+                star.classList.add('pending');
+                star.classList.remove('active');
+            } else {
+                star.classList.add('active');
+                star.classList.remove('pending');
+            }
+        } else {
+            star.classList.remove('active');
+            star.classList.remove('pending');
+        }
+    }
+}
+
+// Función para updatear el estado de las estrellas con WhatsApp (para el envío)
+function actualizarEstrellasSincronizadas(sincronizadas) {
+    const totalPreguntas = state.items.length * 3;
+    for (let i = 0; i < totalPreguntas; i++) {
+        const star = document.getElementById(`star-${i}`);
+        if (!star) return;
+        
+        const itemIdx = Math.floor(i / 3);
+        const subIdx = i % 3;
+        const key = `${itemIdx}_${subIdx}`;
+        
+        if (sincronizadas.includes(key)) {
+            star.classList.add('active');
+            star.classList.remove('pending');
+        } else if (state.answers[key]) {
+            star.classList.add('pending');
+            star.classList.remove('active');
+        }
     }
 }
 
@@ -606,7 +689,7 @@ async function confirmarEnvio() {
     }
     
     if (!respuesta && !state.tieneAudio) {
-        mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
+        mostrarStatus('Debe escribir或 grabar una respuesta antes de confirmar.', 'error');
         return;
     }
 
@@ -619,11 +702,11 @@ async function confirmarEnvio() {
     state.audioChunks = [];
     mostrarStatus('✅ Respuesta guardada localmente.', 'success');
     
-    // --- NUEVO: ENVÍO INDIVIDUAL POR PREGUNTA EN SEGUNDO PLANO ---
+    // --- ENVÍO INDIVIDUAL POR PREGUNTA ---
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
     
-    // Enviar solo esta respuesta a Google Sheets (Fire and Forget)
+    // Enviar solo esta respuesta
     fetch(`${API_BASE}/entrevista-completa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -634,11 +717,14 @@ async function confirmarEnvio() {
     }).then(response => {
         if (response.ok) {
             console.log(`✅ Respuesta ${itemIdx}_${subIdx} enviada a Sheets en 2º plano.`);
+            actualizarEstrellasSincronizadas([`${itemIdx}_${subIdx}`]);
         } else {
-            console.warn(`⚠️ La respuesta ${itemIdx}_${subIdx} no se envió. Se reintentará al final.`);
+            console.warn(`⚠️ La respuesta ${itemIdx}_${subIdx} não se envió. Se reintentará al final.`);
         }
     }).catch(err => {
-        console.warn(`⚠️ Error de red al enviar respuesta ${itemIdx}_${subIdx}. Se reintentará al final.`, err);
+        console.warn(`⚠️ Error de red al enviar respuesta ${itemIdx}_${subIdx}. Se reintentará ao final.`, err);
+        lastSyncError = true;
+        actualizarEstrellas();
     });
     // ------------------------------------------------------------------
 
