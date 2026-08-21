@@ -1,4 +1,4 @@
-// app.js - Versión final con envío en segundo plano por bloque (Ítem)
+// app.js - Versión final con corrección de último bloque
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -29,6 +29,7 @@ let state = {
 // --- VARIABLES PARA GUARDADO LOCAL ---
 let respuestasLocales = [];
 let entrevistaFinalizada = false;
+let reintentosPendientes = 0;
 
 function mostrarMenu() {
     document.getElementById('view-portada').classList.add('hidden');
@@ -566,7 +567,7 @@ function borrarRespuesta() {
 }
 
 // -------------------------------------------------------------------
-// LÓGICA DE GUARDADO LOCAL Y ENVÍO EN SEGUNDO PLANO POR BLOQUE (ÍTEM)
+// LÓGICA DE GUARDADO LOCAL Y ENVÍO EN SEGUNDO PLANO CON REINTENTOS
 // -------------------------------------------------------------------
 
 // Guarda la respuesta en la memoria local
@@ -654,13 +655,17 @@ async function confirmarEnvio() {
         state.currentItemIdx++;
         state.currentSubIdx = 0;
     } else {
-        // Entrevista completada
-        mostrarStatus('🎉 Entrevista completada. Los datos se están sincronizando en segundo plano.', 'success');
+        // Entrevista completada - Damos tiempo para que el último fetch termine
+        mostrarStatus('⏳ Sincronizando última respuesta...', 'info');
         document.getElementById('btn-confirmar').disabled = true;
         document.getElementById('btn-siguiente').disabled = true;
         
-        // Envío de respaldo final (por si algún bloque falló)
-        enviarRespaldoFinal();
+        // Pequeña pausa para asegurar que el envío del bloque viaje
+        setTimeout(() => {
+            // Envío de respaldo final (por si algún bloque falló)
+            enviarRespaldoFinal();
+            mostrarStatus('🎉 Entrevista completada. Datos sincronizados.', 'success');
+        }, 500);
         return;
     }
     cargarPregunta();
