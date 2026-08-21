@@ -52,7 +52,7 @@ function selectRole(role) {
         cargarPerfiles();
         showView('view-experto');
     } else if (role === 'no_experto') {
-        iniciarEntrevistaNoExperto(); // Se inicia inmediatamente, sin pantalla intermedia
+        iniciarEntrevistaNoExperto(); // <--- AHORA INICIA DIRECTAMENTE (sin pantalla intermedia)
     }
 }
 
