@@ -120,7 +120,7 @@
                               placeholder="Su respuesta aparecerá aquí tras la grabación..."></textarea>
                 </div>
 
-                <!-- BOTONES DE ACCIÓN (ESTILO FLOTANTE) -->
+                <!-- BOTONES FLOTANTES (Grabar, Confirmar, Borrar) -->
                 <div class="floating-buttons">
                     <button class="floating-btn btn-delete" id="btn-clear" onclick="borrarRespuesta()" title="Borrar">
                         🗑️
@@ -132,6 +132,15 @@
                         🎙️
                     </button>
                 </div>
+
+                <!-- NAVEGACIÓN (ANTES / SIGUIENTE) -->
+                <div class="nav-container">
+                    <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
+                    <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
+                </div>
+
+                <a href="#" class="home-link" onclick="mostrarMenu()">🏠 Volver al inicio</a>
+                <div id="status-msg" class="status-msg hidden"></div>
             </div>
         </div>
     </div>
