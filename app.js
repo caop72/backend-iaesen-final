@@ -1,4 +1,4 @@
-// app.js - Versión con correcciones críticas de expertos
+// app.js - FINAL: Dictado real, envíos individuales sin tope
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -46,19 +46,13 @@ function goHome() {
     mostrarMenu();
 }
 
-// Verificar compatibilidad de SpeechRecognition y mostrar advertencia si no existe
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (!SpeechRecognition) {
-    alert("Dictado no soportado en este navegador. Escriba manualmente.");
-}
-
 function selectRole(role) {
     state.role = role;
     if (role === 'experto') {
         cargarPerfiles();
         showView('view-experto');
     } else if (role === 'no_experto') {
-        iniciarEntrevistaNoExperto(); // Inicia directamente
+        iniciarEntrevistaNoExperto();
     }
 }
 
@@ -439,6 +433,7 @@ function setupRecordButton() {
 
 async function startRecording() {
     try {
+        // 1. Detener el reconocimiento anterior si existe
         if (state.recognition && state.isRecognizing) {
             state.recognition.abort();
             state.recognition = null;
@@ -462,6 +457,7 @@ async function startRecording() {
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('🎤 Grabando y escuchando...', 'success');
 
+        // 2. Iniciar reconocimiento con configuración óptima
         iniciarReconocimiento();
 
         if (state.recordingTimer) clearInterval(state.recordingTimer);
@@ -482,6 +478,7 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
+            // 3. IMPORTANTE: Abortar reconocimiento para consolidar el texto exacto
             if (state.recognition && state.isRecognizing) {
                 state.recognition.abort();
                 state.isRecognizing = false;
@@ -638,7 +635,7 @@ function borrarRespuesta() {
 }
 
 // -------------------------------------------------------------------
-// LÓGICA DE GUARDADO LOCAL + ENVÍO INDIVIDUAL POR PREGUNTA (CON VERIFICACIÓN)
+// LÓGICA DE GUARDADO LOCAL + ENVÍO INDIVIDUAL POR PREGUNTA
 // -------------------------------------------------------------------
 
 // Guarda la respuesta en la memoria local
@@ -691,24 +688,19 @@ async function confirmarEnvio() {
     state.audioChunks = [];
     mostrarStatus('✅ Respuesta guardada localmente.', 'success');
 
-    // --- ENVÍO INDIVIDUAL POR PREGUNTA (CON VERIFICACIÓN) ---
+    // --- ENVÍO INDIVIDUAL POR PREGUNTA (SIN TOPE) ---
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
 
-    // Enviar solo esta respuesta (con timeout de 10 segundos)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
+    // Enviar solo esta respuesta
     fetch(`${API_BASE}/entrevista-completa?_=${Date.now()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             sessionId: state.sessionId,
             respuestas: [{ itemIdx, subIdx, transcripcion: respuesta }]
-        }),
-        signal: controller.signal
+        })
     }).then(response => {
-        clearTimeout(timeoutId);
         if (response.ok) {
             console.log(`✅ Respuesta ${itemIdx}_${subIdx} enviada a Sheets en 2º plano.`);
             actualizarEstrellasSincronizadas([`${itemIdx}_${subIdx}`]);
@@ -716,8 +708,7 @@ async function confirmarEnvio() {
             console.warn(`⚠️ La respuesta ${itemIdx}_${subIdx} não se envió. Se reintentará al final.`);
         }
     }).catch(err => {
-        clearTimeout(timeoutId);
-        console.warn(`⚠️ Error de red al enviar respuesta ${itemIdx}_${subIdx}. Se reintentará ao final.`, err);
+        console.warn(`⚠️ Error de red al enviar respuesta ${itemIdx}_${subIdx}. Se reintentará al final.`, err);
         lastSyncError = true;
         actualizarEstrellas();
     });

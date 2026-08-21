@@ -399,6 +399,45 @@ async def recibir_entrevista_completa(datos: dict):
         logger.error(f"❌ Error crítico en entrevista completa: {e}")
         raise HTTPException(500, f"Error interno: {str(e)}")
 
+# ----------------- ENDPOINT DE SINCRONIZACIÓN (CRON) -----------------
+@app.post("/api/admin/procesar-pendientes")
+async def procesar_pendientes():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # ELIMINAR el límite de bloques: Procesar todas las respuestas pendientes
+    c.execute('''SELECT id FROM respuestas 
+                 WHERE sync_status = 'pendiente' OR sync_status = 'error_reintentando'
+                 ORDER BY id ASC LIMIT 50''')  # Topo a 50 para proteger el servidor, pero sin bloques de 3
+    pendientes = [row[0] for row in c.fetchall()]
+    conn.close()
+    
+    resultados = {"procesados": 0, "exitosos": 0, "fallidos": 0}
+    
+    for resp_id in pendientes:
+        resultados["procesados"] += 1
+        exito, error = procesar_sincronizacion_unitaria(resp_id)
+        
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        if exito:
+            c.execute('''UPDATE respuestas SET sync_status = 'sincronizado', sync_error = NULL, sync_attempts = 0, synced_at = ? WHERE id = ?''',
+                      (datetime.datetime.now().isoformat(), resp_id))
+            resultados["exitosos"] += 1
+        else:
+            c.execute('''UPDATE respuestas SET sync_status = 'error_reintentando', sync_error = ?, sync_attempts = sync_attempts + 1 WHERE id = ?''',
+                      (error, resp_id))
+            resultados["fallidos"] += 1
+            logger.error(f"Fallo sincronización ID {resp_id}: {error}")
+        conn.commit()
+        conn.close()
+    
+    return JSONResponse({
+        "ok": True,
+        "resumen": resultados,
+        "mensaje": f"Procesados: {resultados['procesados']}. Exitosos: {resultados['exitosos']}. Fallidos: {resultados['fallidos']}."
+    })
+
 # ----------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
