@@ -124,8 +124,7 @@ async function iniciarEntrevistaExperto() {
         entrevistaFinalizada = false;
         
         showView('view-entrevista');
-        // Generar las estrellitas de progreso
-        generarEstrellas();
+        generarEstrellas(); // <--- AGREGADO
         cargarPregunta();
     } catch (e) {
         console.error('Error:', e);
@@ -155,8 +154,7 @@ async function iniciarEntrevistaNoExperto() {
         entrevistaFinalizada = false;
         
         showView('view-entrevista');
-        // Generar las estrellitas de progreso
-        generarEstrellas();
+        generarEstrellas(); // <--- AGREGADO
         cargarPregunta();
     } catch (e) {
         console.error('Error:', e);

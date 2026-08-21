@@ -2,195 +2,45 @@
 <html lang="es-VE">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Entrevistas - IAESEN</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#ffffff">
-    <style>
-        :root {
-            --bg: #ffffff;
-            --surface: #ffffff;
-            --text-primary: #000000;
-            --text-secondary: #333333;
-            --text-tertiary: #666666;
-            --text-muted: #999999;
-            --border: #e0e0e0;
-            --border-strong: #cccccc;
-            --danger: #d32f2f;
-            --danger-light: #ffebee;
-            --success: #2e7d32;
-            --success-light: #e8f5e9;
-            --accent: #ffe600;
-            --accent-dark: #e6cf00;
-            --accent-light: #fff9c4;
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --shadow: 0 1px 3px rgba(0,0,0,0.08);
-            --shadow-lg: 0 4px 20px rgba(0,0,0,0.10);
-            --amber: #ff9800;
-            --amber-light: #fff3e0;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text-primary); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 16px; -webkit-tap-highlight-color: transparent; }
-        .app-container { width: 100%; max-width: 520px; margin: 0 auto; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
-        .btn { display: inline-block; width: 100%; padding: 13px 0; border: none; border-radius: var(--radius-md); font-weight: 700; font-size: 15px; cursor: pointer; transition: all 0.2s; text-align: center; color: var(--text-primary); background: var(--accent); }
-        .btn:hover { opacity: 0.9; transform: scale(1.01); background: var(--accent-dark); }
-        .btn:active { transform: scale(0.98); }
-        .btn-primary { background: var(--accent); color: #000; }
-        .btn-primary:hover { background: var(--accent-dark); }
-        .btn-secondary { background: #ffffff; color: var(--text-secondary); border: 1px solid var(--border-strong); }
-        .btn-secondary:hover { background: #f5f5f5; }
-        .hidden { display: none !important; }
-        .form-group { margin-bottom: 16px; text-align: left; }
-        .form-group label { display: block; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 15px; font-family: inherit; color: var(--text-primary); background: var(--surface); outline: none; }
-        .form-group select:focus, .form-group input:focus { border-color: var(--accent-dark); box-shadow: 0 0 0 3px rgba(230, 207, 0, 0.3); }
-        .hex-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 12px; min-width: 90px; }
-        .hex-icon { width: 45px; height: 45px; }
-        .hex-label { font-size: 10px; font-weight: 700; color: var(--text-secondary); margin-top: 2px; text-align: center; }
-        .hex-side { stroke: var(--border-strong); stroke-width: 5; stroke-linecap: round; transition: stroke 0.3s ease; }
-        .hex-side.active { stroke: var(--danger); stroke-width: 6; }
-        .audio-player-box { background: var(--surface); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--border); }
-        .audio-player-box audio { width: 100%; }
-        .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        .btn-action { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text-primary); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-        .btn-action:active { transform: scale(0.98); background: var(--border); }
-        .btn-action.playing { border-color: var(--accent-dark); background: var(--accent-light); }
-        .btn-record { color: var(--text-secondary); }
-        .btn-record.recording { border-color: var(--danger); background: var(--danger-light); color: var(--danger); }
-        .btn-play-response { color: var(--text-secondary); }
-        .btn-play-response:disabled { opacity: 0.4; cursor: not-allowed; }
-        .vu-meter { display: none; align-items: center; gap: 3px; height: 20px; margin-left: 8px; }
-        .vu-meter.active { display: flex; }
-        .vu-bar { width: 4px; background: var(--danger); animation: bounce 0.6s infinite alternate; border-radius: 2px; }
-        .vu-bar:nth-child(2) { animation-delay: 0.1s; }
-        .vu-bar:nth-child(3) { animation-delay: 0.2s; }
-        .vu-bar:nth-child(4) { animation-delay: 0.3s; }
-        .vu-bar:nth-child(5) { animation-delay: 0.4s; }
-        @keyframes bounce { 0% { height: 4px; } 100% { height: 18px; } }
-        #transcription-box { width: 100%; min-height: 100px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 15px; line-height: 1.65; color: var(--text-primary); background: var(--surface); resize: vertical; font-family: inherit; outline: none; }
-        #transcription-box:focus { border-color: var(--accent-dark); box-shadow: 0 0 0 3px rgba(230, 207, 0, 0.3); }
-        #transcription-box::placeholder { color: var(--text-muted); }
-        .status-msg { padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; line-height: 1.5; margin-top: 12px; display: none; }
-        .status-msg.visible { display: block; }
-        .status-msg.success { background: var(--success-light); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); }
-        .status-msg.error { background: var(--danger-light); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent); }
-        .status-msg.info { background: var(--accent-light); color: var(--text-primary); border: 1px solid color-mix(in srgb, var(--accent-dark) 20%, transparent); }
-        .status-msg.warning { background: var(--amber-light); color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 20%, transparent); }
-        
-        /* PROGRESO CON ESTRELLITAS */
-        .progress-stars {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            margin-top: 10px;
-            margin-bottom: 14px;
-            padding: 10px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-        }
-        .star {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--border-strong);
-            transition: background 0.3s ease, transform 0.3s ease;
-            cursor: default;
-            position: relative;
-        }
-        .star.active {
-            background: var(--success);
-            transform: scale(1.2);
-            box-shadow: 0 2px 6px rgba(46,125,50,0.3);
-        }
-        .star.pending {
-            background: var(--amber);
-            transform: scale(1.1);
-            box-shadow: 0 2px 6px rgba(255,152,0,0.3);
-            animation: pulse 1.5s infinite;
-        }
-        .star-failed {
-            color: var(--danger);
-            font-size: 12px;
-            position: absolute;
-            top: -10px;
-            right: -8px;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-        .total-stars-label {
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-left: 6px;
-            text-align: center;
-            display: block;
-        }
-        
-        .footer-navigation {
-            display: grid;
-            grid-template-columns: auto 1fr 1fr auto;
-            gap: 8px;
-            align-items: center;
-            margin-top: 16px;
-        }
-        .nav-arrow { background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer; padding: 0 8px; transition: transform 0.1s; }
-        .nav-arrow:hover { transform: scale(1.1); }
-        .nav-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-submit { background: var(--accent); color: #000; border: none; border-radius: var(--radius-md); padding: 12px 20px; font-size: 15px; font-weight: 700; cursor: pointer; flex-grow: 1; text-align: center; transition: opacity 0.2s; }
-        .btn-submit:hover { opacity: 0.9; background: var(--accent-dark); }
-        .btn-submit:disabled { opacity: 0.35; cursor: not-allowed; }
-        .btn-clear { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 12px 16px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-        .btn-clear:hover { background: var(--danger-light); }
-        .btn-clear:disabled { opacity: 0.35; cursor: not-allowed; }
-        .home-link { display: block; text-align: center; margin-top: 12px; color: var(--text-tertiary); font-size: 13px; text-decoration: none; }
-        .home-link:hover { color: var(--text-secondary); }
-        .progress-track { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--accent-dark); border-radius: 2px; transition: width 0.5s ease; }
-        .status-indicator { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-strong); transition: all 0.3s ease; flex-shrink: 0; margin-left: 8px; }
-        .status-indicator.locked { background: var(--danger-light); border-color: var(--danger); }
-        .status-indicator.listening { background: var(--accent-light); border-color: var(--accent-dark); }
-        .status-indicator.ready { background: var(--success-light); border-color: var(--success); }
-        @media (max-width: 480px) { .card { padding: 16px; } .action-buttons { grid-template-columns: 1fr; } .nav-arrow { font-size: 20px; } .star { width: 14px; height: 14px; } }
-    </style>
+    <meta name="theme-color" content="#ffe600">
+    <link rel="icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="app-container" id="app">
         <!-- PORTADA INSTITUCIONAL -->
         <div id="view-portada" class="hidden">
-            <div class="card" style="padding: 40px 24px; text-align: center; background: var(--accent); border: none;">
-                <h2 style="color: #000; margin-bottom: 4px; font-size: 1.2rem; font-weight: 800;">INSTITUTO DE ALTOS ESTUDIOS DE SEGURIDAD DE LA NACIÓN</h2>
-                <p style="color: #222; font-size: 0.9rem; margin-bottom: 20px;">Caracas - Venezuela<br>Doctorado en Seguridad de la Nación</p>
-                <h3 style="color: #000; font-size: 1.1rem; line-height: 1.5; margin-bottom: 16px; font-weight: 700;">
+            <div class="card" style="background: var(--accent); border: none;">
+                <h2 class="title">INSTITUTO DE ALTOS ESTUDIOS DE SEGURIDAD DE LA NACIÓN</h2>
+                <p class="subtitle">Caracas - Venezuela<br>Doctorado en Seguridad de la Nación</p>
+                <h3 class="project-title">
                     “Modelo epistémico aplicado a un Sistema Cibernético Complejo<br>
                     para la conformación de un esquema Praxiológico de Defensa Soterrada<br>
                     en el marco de la Seguridad de la Nación”
                 </h3>
-                <p style="color: #222; font-size: 0.95rem; margin-bottom: 4px;"><strong>Investigador:</strong> Cnel. César Augusto Ontivero Pérez</p>
-                <p style="color: #333; font-size: 0.85rem; margin-bottom: 20px; line-height: 1.4;">
+                <p class="researcher"><strong>Investigador:</strong> Cnel. César Augusto Ontivero Pérez</p>
+                <p class="info-text">
                     Esta entrevista forma parte de una investigación doctoral.<br>
                     Su participación es voluntaria y sus respuestas serán tratadas con estricta confidencialidad.<br>
                     El tiempo estimado de la entrevista es de 30 a 60 minutos.
                 </p>
-                <button class="btn" onclick="mostrarMenu()" style="background: #000; color: var(--accent); max-width: 300px; margin: 0 auto; font-weight: 700;">➡️ Comenzar</button>
+                <button class="btn" onclick="mostrarMenu()" style="background: #000; color: var(--accent); max-width: 300px; margin: 0 auto;">➡️ Comenzar</button>
             </div>
         </div>
 
         <!-- MENÚ DE TARJETAS (Roles) -->
         <div id="view-home" class="hidden">
             <div class="card" onclick="selectRole('experto')" style="cursor: pointer; background: var(--accent); border: none;">
-                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #000; font-weight: 800;"><span style="font-size: 1.8rem;">🔴</span> Experto</h2>
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #000;"><span style="font-size: 1.8rem;">🔴</span> Experto</h2>
                 <p style="color: #222;">Acceso a la entrevista formal con selección de perfil.</p>
                 <button class="btn" style="background: #000; color: var(--accent);">Acceder</button>
             </div>
             <div class="card" onclick="selectRole('no_experto')" style="cursor: pointer; background: var(--accent); border: none;">
-                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #000; font-weight: 800;"><span style="font-size: 1.8rem;">🔵</span> No experto</h2>
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #000;"><span style="font-size: 1.8rem;">🔵</span> No experto</h2>
                 <p style="color: #222;">Participación anónima. No se guardan datos personales.</p>
                 <button class="btn" style="background: #000; color: var(--accent);">Entrar</button>
             </div>
@@ -231,7 +81,7 @@
 
         <!-- PORTAL DE ENTREVISTA -->
         <div id="view-entrevista" class="hidden">
-            <div class="card" style="background: var(--surface);">
+            <div class="card">
                 <!-- Barra de progreso -->
                 <div class="progress-track">
                     <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
@@ -267,7 +117,7 @@
                 </div>
 
                 <!-- AUDIO -->
-                <div class="audio-player-box" style="margin-bottom: 12px; background: var(--accent-light);">
+                <div class="audio-player-box">
                     <audio id="context-audio" controls style="width: 100%;"></audio>
                 </div>
 
@@ -275,14 +125,12 @@
                 <div style="margin-bottom: 12px;">
                     <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">Verifique su respuesta antes de confirmar su envío:</div>
                     <textarea id="transcription-box" 
-                              placeholder="Su respuesta aparecerá aquí tras la grabación..." 
-                              style="min-height: 100px; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 15px; line-height: 1.65; color: var(--text-primary); background: var(--surface); resize: vertical; font-family: inherit; outline: none;">
-                    </textarea>
+                              placeholder="Su respuesta aparecerá aquí tras la grabación..."></textarea>
                 </div>
 
                 <!-- BOTONES DE ACCIÓN -->
-                <div class="action-buttons" style="margin-bottom: 12px;">
-                    <button class="btn-action btn-record" id="btn-record" style="flex: 2;">
+                <div class="action-buttons">
+                    <button class="btn-action btn-record" id="btn-record">
                         <span id="record-icon">🎙️</span> 
                         <span id="record-text">grabar su opinión</span>
                         <div class="vu-meter" id="vu-meter">
