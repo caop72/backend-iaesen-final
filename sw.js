@@ -1,4 +1,4 @@
-const CACHE_NAME = 'entrevistas-ontivero-v3';
+const CACHE_NAME = 'iaesen-v4';
 const urlsToCache = [
     '/',
     '/index.html',
@@ -23,6 +23,7 @@ self.addEventListener('activate', event => {
                     if (cacheName !== CACHE_NAME) {
                         return caches.delete(cacheName);
                     }
+                    return null;
                 })
             );
         })
@@ -30,15 +31,21 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// IMPORTANTE: El Service Worker NO debe interceptar el audio ni la voz
-self.addEventListener('fetch', event => {
-    // Solo cachear archivos estáticos. Ignorar todo lo demás (audio, API, etc.)
-    if (event.request.url.includes('/api/') || event.request.url.includes('.mp3') || event.request.url.includes('.webm')) {
-        return; // No interceptar API, audio ni voz
+// 🔴 CRÍTICO: NUNCA cachear APIs ni métodos POST/PUT/DELETE
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+    const esAPI = url.pathname.startsWith('/api/');
+    const esPOST = event.request.method !== 'GET';
+
+    if (esAPI || esPOST) {
+        event.respondWith(fetch(event.request));
+        return;
     }
-    
+
+    // Cache-first SOLO para assets estáticos (HTML, CSS, JS, MP3)
     event.respondWith(
-        caches.match(event.request)
-            .then(response => response || fetch(event.request))
+        caches.match(event.request).then((response) => {
+            return response || fetch(event.request);
+        })
     );
 });

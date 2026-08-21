@@ -11,6 +11,14 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+    <!-- ⏳ OVERLAY DE CARGA (Cold Start de Render) -->
+    <div id="loading-overlay" style="position: fixed; inset: 0; background: #fff; display: flex; align-items: center; justify-content: center; z-index: 9999;">
+        <div style="text-align: center;">
+            <h2 style="color: #333; margin-bottom: 10px;">Iniciando sistema...</h2>
+            <p style="color: #777; font-size: 14px;">Espere unos segundos, por favor.</p>
+        </div>
+    </div>
+
     <div class="app-container" id="app">
         <!-- PORTADA INSTITUCIONAL (Unificada con los dos roles) -->
         <div id="view-portada" class="hidden">
@@ -145,6 +153,19 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // ✅ Verificar conexión con backend y ocultar overlay de carga
+        (async () => {
+            try {
+                await fetch('https://backend-iaesen-final.onrender.com/', { method: 'HEAD' });
+                document.getElementById('loading-overlay').style.display = 'none';
+            } catch (e) {
+                // Esperar 2 segundos si hay error y recargar
+                setTimeout(() => location.reload(), 2000);
+            }
+        })();
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

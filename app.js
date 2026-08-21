@@ -1,4 +1,4 @@
-// app.js - Dictado en vivo real, estrellitas, envío y navegación
+// app.js - Versión con correcciones críticas de expertos
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -44,6 +44,12 @@ function showView(viewId) {
 
 function goHome() {
     mostrarMenu();
+}
+
+// Verificar compatibilidad de SpeechRecognition y mostrar advertencia si no existe
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) {
+    alert("Dictado no soportado en este navegador. Escriba manualmente.");
 }
 
 function selectRole(role) {
@@ -564,7 +570,7 @@ function iniciarReconocimiento() {
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
 
-        // 👇 DICTADO EN VIVO: Mostrar texto final + intermedio
+        // 👇 DICTADO EN VIVO REAL: Mostrar texto final + intermedio
         tb.value = (state.transcripcionFinal || '') + (interimText ? ' ' + interimText : '');
         tb.scrollTop = tb.scrollHeight;
     };
@@ -632,7 +638,7 @@ function borrarRespuesta() {
 }
 
 // -------------------------------------------------------------------
-// LÓGICA DE GUARDADO LOCAL + ENVÍO INDIVIDUAL POR PREGUNTA
+// LÓGICA DE GUARDADO LOCAL + ENVÍO INDIVIDUAL POR PREGUNTA (CON VERIFICACIÓN)
 // -------------------------------------------------------------------
 
 // Guarda la respuesta en la memoria local
@@ -685,19 +691,24 @@ async function confirmarEnvio() {
     state.audioChunks = [];
     mostrarStatus('✅ Respuesta guardada localmente.', 'success');
 
-    // --- ENVÍO INDIVIDUAL POR PREGUNTA ---
+    // --- ENVÍO INDIVIDUAL POR PREGUNTA (CON VERIFICACIÓN) ---
     const itemIdx = state.currentItemIdx;
     const subIdx = state.currentSubIdx;
 
-    // Enviar solo esta respuesta
-    fetch(`${API_BASE}/entrevista-completa`, {
+    // Enviar solo esta respuesta (con timeout de 10 segundos)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    fetch(`${API_BASE}/entrevista-completa?_=${Date.now()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             sessionId: state.sessionId,
             respuestas: [{ itemIdx, subIdx, transcripcion: respuesta }]
-        })
+        }),
+        signal: controller.signal
     }).then(response => {
+        clearTimeout(timeoutId);
         if (response.ok) {
             console.log(`✅ Respuesta ${itemIdx}_${subIdx} enviada a Sheets en 2º plano.`);
             actualizarEstrellasSincronizadas([`${itemIdx}_${subIdx}`]);
@@ -705,6 +716,7 @@ async function confirmarEnvio() {
             console.warn(`⚠️ La respuesta ${itemIdx}_${subIdx} não se envió. Se reintentará al final.`);
         }
     }).catch(err => {
+        clearTimeout(timeoutId);
         console.warn(`⚠️ Error de red al enviar respuesta ${itemIdx}_${subIdx}. Se reintentará ao final.`, err);
         lastSyncError = true;
         actualizarEstrellas();
