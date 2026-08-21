@@ -12,7 +12,7 @@
 </head>
 <body>
     <div class="app-container" id="app">
-        <!-- PORTADA INSTITUCIONAL (INICIO COMPACTO) -->
+        <!-- PORTADA INSTITUCIONAL -->
         <div id="view-portada" class="hidden">
             <div class="card" style="background: var(--accent); border: none;">
                 <h2 class="title">INSTITUTO DE ALTOS ESTUDIOS DE SEGURIDAD DE LA NACIÓN</h2>
@@ -28,15 +28,21 @@
                     Su participación es voluntaria y sus respuestas serán tratadas con estricta confidencialidad.<br>
                     El tiempo estimado de la entrevista es de 30 a 60 minutos.
                 </p>
-                <p class="subtitle" style="margin-top: 16px;">Seleccione su modo de participación</p>
-                <div class="role-selection">
-                    <button class="btn-role" onclick="selectRole('experto')">
-                        <span>🔴</span> Experto
-                    </button>
-                    <button class="btn-role" onclick="selectRole('no_experto')">
-                        <span>🔵</span> No experto
-                    </button>
-                </div>
+                <button class="btn" onclick="mostrarMenu()" style="background: #000; color: var(--accent); max-width: 300px; margin: 0 auto;">➡️ Comenzar</button>
+            </div>
+        </div>
+
+        <!-- MENÚ DE TARJETAS (Roles) -->
+        <div id="view-home" class="hidden">
+            <div class="card" onclick="selectRole('experto')" style="cursor: pointer; background: var(--accent); border: none;">
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #000;"><span style="font-size: 1.8rem;">🔴</span> Experto</h2>
+                <p style="color: #222;">Acceso a la entrevista formal con selección de perfil.</p>
+                <button class="btn" style="background: #000; color: var(--accent);">Acceder</button>
+            </div>
+            <div class="card" onclick="selectRole('no_experto')" style="cursor: pointer; background: var(--accent); border: none;">
+                <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #000;"><span style="font-size: 1.8rem;">🔵</span> No experto</h2>
+                <p style="color: #222;">Participación anónima. No se guardan datos personales.</p>
+                <button class="btn" style="background: #000; color: var(--accent);">Entrar</button>
             </div>
         </div>
 
@@ -114,22 +120,29 @@
                               placeholder="Su respuesta aparecerá aquí tras la grabación..."></textarea>
                 </div>
 
-                <!-- BOTONES FLOTANTES (Grabar, Confirmar, Borrar) -->
-                <div class="floating-buttons">
-                    <button class="floating-btn btn-delete" id="btn-clear" onclick="borrarRespuesta()" title="Borrar">
-                        🗑️
+                <!-- BOTONES DE ACCIÓN -->
+                <div class="action-buttons">
+                    <button class="btn-action btn-record" id="btn-record">
+                        <span id="record-icon">🎙️</span> 
+                        <span id="record-text">grabar su opinión</span>
+                        <div class="vu-meter" id="vu-meter">
+                            <div class="vu-bar" style="height: 6px;"></div>
+                            <div class="vu-bar" style="height: 14px;"></div>
+                            <div class="vu-bar" style="height: 10px;"></div>
+                            <div class="vu-bar" style="height: 18px;"></div>
+                            <div class="vu-bar" style="height: 8px;"></div>
+                        </div>
                     </button>
-                    <button class="floating-btn btn-confirm" id="btn-confirmar" onclick="confirmarEnvio()" title="Confirmar envío" disabled>
-                        ✅
-                    </button>
-                    <button class="floating-btn btn-record" id="btn-record" title="Grabar respuesta">
-                        🎙️
+                    <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" style="display: none;" disabled>
+                        ▶️ Reproducir mi respuesta
                     </button>
                 </div>
 
-                <!-- NAVEGACIÓN (ANTES / SIGUIENTE) -->
-                <div class="nav-container">
+                <!-- BARRA DE NAVEGACIÓN INFERIOR -->
+                <div class="footer-navigation">
                     <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
+                    <button class="btn-clear" id="btn-clear" onclick="borrarRespuesta()">🗑️ Borrar</button>
+                    <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar envío</button>
                     <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
                 </div>
 

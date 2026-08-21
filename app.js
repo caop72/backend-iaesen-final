@@ -1,4 +1,4 @@
-// app.js - FINAL FUNCIONAL: Audio + Texto + Envío + Botones Flotantes
+// app.js - FINAL COMPLETO: Estrellitas, texto en vivo, no bloqueo de confirmación
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -52,7 +52,7 @@ function selectRole(role) {
         cargarPerfiles();
         showView('view-experto');
     } else if (role === 'no_experto') {
-        iniciarEntrevistaNoExperto();
+        iniciarEntrevistaNoExperto(); // Se inicia inmediatamente, sin pantalla intermedia
     }
 }
 
@@ -453,6 +453,7 @@ function setupRecordButton() {
 
 async function startRecording() {
     try {
+        // 1. Detener el reconocimiento anterior si existe
         if (state.recognition && state.isRecognizing) {
             state.recognition.abort();
             state.recognition = null;
@@ -476,6 +477,7 @@ async function startRecording() {
         document.getElementById('vu-meter').classList.add('active');
         mostrarStatus('🎤 Grabando y escuchando...', 'success');
 
+        // 2. Iniciar reconocimiento con configuración óptima
         iniciarReconocimiento();
 
         if (state.recordingTimer) clearInterval(state.recordingTimer);
@@ -496,6 +498,7 @@ async function startRecording() {
                 clearInterval(state.recordingTimer);
                 state.recordingTimer = null;
             }
+            // 3. IMPORTANTE: Abortar reconocimiento para consolidar el texto exacto
             if (state.recognition && state.isRecognizing) {
                 state.recognition.abort();
                 state.isRecognizing = false;
@@ -526,15 +529,20 @@ function stopRecording() {
         state.stream = null;
     }
 
+    // CONSOLIDAR TEXTO FINAL DESPUÉS DE DETENER
     setTimeout(() => {
         const tb = document.getElementById('transcription-box');
         if (tb && state.transcripcionFinal) {
+            // Limpiar texto repetido e incompleto
             let textoFinal = state.transcripcionFinal.trim();
+            // Borrar duplicados consecutivos si existen
             textoFinal = textoFinal.replace(/(\b\w+\b)(?:\s+\1)+/g, '$1');
             tb.value = textoFinal;
             state.textoManual = textoFinal;
             state.transcripcionFinal = textoFinal;
         }
+        
+        // 💡 AGREGAR ESTA LÍNEA: Inmediatamente habilitar el botón "Confirmar"
         document.getElementById('btn-confirmar').disabled = false;
     }, 100);
 }
@@ -565,6 +573,7 @@ function iniciarReconocimiento() {
     };
 
     state.recognition.onresult = (event) => {
+        // SOLO acumular texto final (no interim)
         let finalText = '';
         for (let i = 0; i < event.results.length; i++) {
             if (event.results[i].isFinal) {
@@ -575,6 +584,7 @@ function iniciarReconocimiento() {
             state.transcripcionFinal += finalText;
         }
 
+        // Solo mostrar interim en el cuadro de forma TEMPORAL
         const tb = document.getElementById('transcription-box');
         if (!tb) return;
         let interim = '';
@@ -685,12 +695,12 @@ async function confirmarEnvio() {
     }
     
     if (!respuesta && state.tieneAudio) {
-        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
-        return;
-    }
+    mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
+    return;
+}
     
     if (!respuesta && !state.tieneAudio) {
-        mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
+        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escriba su respuesta.', 'error');
         return;
     }
 
