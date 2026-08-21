@@ -1,4 +1,4 @@
-/* styles.css - Estilo Cashea con botones flotantes y navegación */
+/* styles.css - Estilo Cashea compacto con botones flotantes */
 :root {
     --bg: #ffffff;
     --surface: #ffffff;
@@ -54,6 +54,69 @@ body {
     box-shadow: var(--shadow);
     margin-bottom: 16px;
 }
+
+/* PORTADA COMPACTA */
+.title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #000;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    color: #222;
+    margin-bottom: 20px;
+}
+
+.project-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #000;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.researcher {
+    font-size: 0.95rem;
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.info-text {
+    font-size: 0.85rem;
+    color: #333;
+    line-height: 1.4;
+    margin-bottom: 20px;
+}
+
+/* SELECCIÓN DE ROLES EN LA PORTADA */
+.role-selection {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.btn-role {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 0;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--accent);
+    background: #000;
+    transition: all 0.2s;
+}
+
+.btn-role:hover { opacity: 0.9; transform: scale(1.02); }
+
+.btn-role span { font-size: 1.4rem; }
 
 .btn {
     display: inline-block;
@@ -277,6 +340,7 @@ body {
 
 @media (max-width: 480px) {
     .card { padding: 16px; }
+    .btn-role { font-size: 13px; padding: 12px 0; }
     .floating-btn { font-size: 20px; }
     .btn-delete { width: 42px; height: 42px; }
     .btn-confirm { width: 50px; height: 50px; }

@@ -1,4 +1,4 @@
-// app.js - FINAL DEFINITIVO: Audio, texto, envío, navegación, estrellitas y botones flotantes
+// app.js - FINAL FUNCIONAL: Audio + Texto + Envío + Botones Flotantes
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -386,7 +386,20 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         mostrarStatus('No se pudo cargar el audio. Puede leer la pregunta y responder igualmente.', 'error');
     };
 
+    actualizarHexagono();
     mostrarStatus('', '');
+}
+
+function actualizarHexagono() {
+    const hexLabel = document.getElementById('hex-label-text');
+    const itemNum = state.currentItemIdx + 1;
+    const subNum = state.currentSubIdx + 1;
+    const sufijos = ['RA', 'DA', 'RA'];
+    hexLabel.textContent = `${subNum}${sufijos[subNum-1]} PREGUNTA`;
+    for (let i = 1; i <= 6; i++) {
+        const side = document.getElementById(`side-${i}`);
+        side.classList.toggle('active', i === itemNum);
+    }
 }
 
 function setupRecordButton() {
