@@ -1,10 +1,10 @@
-const CACHE_NAME = 'entrevistas-ontivero-v2'; // ACTUALIZADO de v1 a v2
+const CACHE_NAME = 'entrevistas-ontivero-v3';
 const urlsToCache = [
     '/',
     '/index.html',
     '/app.js',
     '/manifest.json',
-    '/logo-iaesen.png' // AGREGADO: Logo institucional
+    '/logo-iaesen.png'
 ];
 
 self.addEventListener('install', event => {
@@ -12,7 +12,7 @@ self.addEventListener('install', event => {
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(urlsToCache))
     );
-    self.skipWaiting(); // Forzar activación inmediata
+    self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -20,7 +20,6 @@ self.addEventListener('activate', event => {
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
-                    // Borrar cachés viejas (menores a la versión actual)
                     if (cacheName !== CACHE_NAME) {
                         return caches.delete(cacheName);
                     }
@@ -28,10 +27,16 @@ self.addEventListener('activate', event => {
             );
         })
     );
-    self.clients.claim(); // Tomar control inmediato de las páginas abiertas
+    self.clients.claim();
 });
 
+// IMPORTANTE: El Service Worker NO debe interceptar el audio ni la voz
 self.addEventListener('fetch', event => {
+    // Solo cachear archivos estáticos. Ignorar todo lo demás (audio, API, etc.)
+    if (event.request.url.includes('/api/') || event.request.url.includes('.mp3') || event.request.url.includes('.webm')) {
+        return; // No interceptar API, audio ni voz
+    }
+    
     event.respondWith(
         caches.match(event.request)
             .then(response => response || fetch(event.request))
