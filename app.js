@@ -1,4 +1,4 @@
-// app.js - FINAL COMPLETO: Estrellitas, texto en vivo, no bloqueo de confirmación
+// app.js - FINAL: Con botones flotantes y transcripción maximizada
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
 let state = {
@@ -52,7 +52,7 @@ function selectRole(role) {
         cargarPerfiles();
         showView('view-experto');
     } else if (role === 'no_experto') {
-        iniciarEntrevistaNoExperto(); // Se inicia inmediatamente, sin pantalla intermedia
+        iniciarEntrevistaNoExperto();
     }
 }
 
@@ -373,7 +373,6 @@ async function cargarPreguntaReal(itemNum, subIdx, globalIdx) {
         actualizarEstadoIndicador();
         state.isPlaying = false;
         document.getElementById('btn-record').disabled = false;
-        document.getElementById('btn-play-response').disabled = false;
         document.getElementById('btn-confirmar').disabled = false;
         mostrarStatus('Pregunta terminada. Puede grabar o escribir su respuesta.', 'info');
     };
@@ -695,12 +694,12 @@ async function confirmarEnvio() {
     }
     
     if (!respuesta && state.tieneAudio) {
-    mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
-    return;
-}
+        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
+        return;
+    }
     
     if (!respuesta && !state.tieneAudio) {
-        mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escriba su respuesta.', 'error');
+        mostrarStatus('Debe escribir o grabar una respuesta antes de confirmar.', 'error');
         return;
     }
 

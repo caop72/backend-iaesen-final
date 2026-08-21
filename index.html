@@ -120,34 +120,18 @@
                               placeholder="Su respuesta aparecerá aquí tras la grabación..."></textarea>
                 </div>
 
-                <!-- BOTONES DE ACCIÓN -->
-                <div class="action-buttons">
-                    <button class="btn-action btn-record" id="btn-record">
-                        <span id="record-icon">🎙️</span> 
-                        <span id="record-text">grabar su opinión</span>
-                        <div class="vu-meter" id="vu-meter">
-                            <div class="vu-bar" style="height: 6px;"></div>
-                            <div class="vu-bar" style="height: 14px;"></div>
-                            <div class="vu-bar" style="height: 10px;"></div>
-                            <div class="vu-bar" style="height: 18px;"></div>
-                            <div class="vu-bar" style="height: 8px;"></div>
-                        </div>
+                <!-- BOTONES DE ACCIÓN (ESTILO FLOTANTE) -->
+                <div class="floating-buttons">
+                    <button class="floating-btn btn-delete" id="btn-clear" onclick="borrarRespuesta()" title="Borrar">
+                        🗑️
                     </button>
-                    <button class="btn-action btn-play-response" id="btn-play-response" onclick="playResponse()" style="display: none;" disabled>
-                        ▶️ Reproducir mi respuesta
+                    <button class="floating-btn btn-confirm" id="btn-confirmar" onclick="confirmarEnvio()" title="Confirmar envío" disabled>
+                        ✅
+                    </button>
+                    <button class="floating-btn btn-record" id="btn-record" title="Grabar respuesta">
+                        🎙️
                     </button>
                 </div>
-
-                <!-- BARRA DE NAVEGACIÓN INFERIOR -->
-                <div class="footer-navigation">
-                    <button class="nav-arrow" id="btn-anterior" onclick="navegar(-1)" disabled>&#9664;</button>
-                    <button class="btn-clear" id="btn-clear" onclick="borrarRespuesta()">🗑️ Borrar</button>
-                    <button class="btn-submit" id="btn-confirmar" onclick="confirmarEnvio()">Confirmar envío</button>
-                    <button class="nav-arrow" id="btn-siguiente" onclick="navegar(1)" disabled>&#9654;</button>
-                </div>
-
-                <a href="#" class="home-link" onclick="mostrarMenu()">🏠 Volver al inicio</a>
-                <div id="status-msg" class="status-msg hidden"></div>
             </div>
         </div>
     </div>
