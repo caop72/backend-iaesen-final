@@ -695,9 +695,9 @@ async function confirmarEnvio() {
     }
     
     if (!respuesta && state.tieneAudio) {
-        mostrarStatus('✅ Respuesta guardada localmente. El texto se agregará si es posible.', 'success');
-        respuesta = ""; // Se enviará el audio (sin placeholder)
-    }
+    mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escribir su respuesta.', 'error');
+    return;
+}
     
     if (!respuesta && !state.tieneAudio) {
         mostrarStatus('❌ No se pudo transcribir. Por favor, grabe nuevamente o escriba su respuesta.', 'error');

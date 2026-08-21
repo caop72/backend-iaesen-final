@@ -319,7 +319,7 @@ async def guardar_respuesta(
         raise HTTPException(422, "Debe proporcionar transcripción o audio")
     
     if not transcripcion.strip():
-        transcripcion = "[Respuesta de voz]"
+    raise HTTPException(422, "Debe proporcionar una transcripción válida. Grabe nuevamente o escribir su respuesta.")
     
     audio_path = None
     if audio:
