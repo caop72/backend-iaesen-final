@@ -32,11 +32,20 @@ body {
     background: var(--bg);
     color: var(--text-primary);
     min-height: 100vh;
+    margin: 0; /* <--- ELIMINAR MARGENES POR DEFECTO */
+    padding: 0; /* <--- ELIMINAR PADDING PARA QUE NO HAYA ESPACIOS EN BLANCO */
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 16px;
     -webkit-tap-highlight-color: transparent;
+}
+
+/* Ajuste del contenedor principal para dispositivos móviles */
+.app-container {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 16px; /* <--- El padding se lo damos al contenedor, no al body */
 }
 
 .app-container { width: 100%; max-width: 520px; margin: 0 auto; }
