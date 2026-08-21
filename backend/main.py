@@ -318,8 +318,8 @@ async def guardar_respuesta(
     if not transcripcion.strip() and audio is None:
         raise HTTPException(422, "Debe proporcionar transcripción o audio")
     
-    if not transcripcion.strip():
-    raise HTTPException(422, "Debe proporcionar una transcripción válida. Grabe nuevamente o escribir su respuesta.")
+    # ELIMINADO: if not transcripcion.strip(): transcripcion = "[Respuesta de voz]"
+    # (Ya no se usa el placeholder)
     
     audio_path = None
     if audio:
@@ -379,7 +379,7 @@ async def recibir_entrevista_completa(datos: dict):
             c.execute('''INSERT INTO respuestas 
                          (sesion_id, item_idx, sub_idx, transcripcion, lang, sync_status, created_at)
                          VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                      (session_id, r["itemIdx"], r["subIdx"], r["transcripcion"] or "[Respuesta de voz]", "es-VE", "pendiente", datetime.datetime.now()))
+                      (session_id, r["itemIdx"], r["subIdx"], r["transcripcion"] or "", "es-VE", "pendiente", datetime.datetime.now()))
             ids_guardados.append(c.lastrowid)
         conn.commit()
         conn.close()
