@@ -1,3 +1,17 @@
+// ============================================================
+// 🔴 PARCHE DE EMERGENCIA - FASE 0
+// Deshabilitar Service Worker temporalmente
+// ============================================================
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(registration => {
+            registration.unregister();
+            console.log('🔴 Service Worker deshabilitado temporalmente');
+        });
+    });
+}
+// ============================================================
+
 // app.js - FINAL: Dictado real, envíos individuales sin tope
 const API_BASE = 'https://backend-iaesen-final.onrender.com/api';
 
